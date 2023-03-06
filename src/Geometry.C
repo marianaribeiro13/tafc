@@ -25,4 +25,8 @@ distance(d) {
     scintillator->SetLineColor(kBlue);
     top->AddNode(scintillator, 1, tr1);
     top->AddNode(scintillator, 2, tr2);
+
+    geom->CloseGeometry();
 }
+
+Geometry::~Geometry(){}
