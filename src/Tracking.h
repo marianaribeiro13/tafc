@@ -6,10 +6,15 @@
 class Tracking : public Geometry{
 
 public:
-	// constructors and destructor
-	Tracking();
-	~Tracking();
-
+  // constructors and destructors
+  Tracking(Double_t *point, Double_t *dir);
+  ~Tracking();
+  const Double_t* GetCurPoint();
+  const Double_t* GetCurDir();
+  TGeoNode* GetCurState();
+  void AddTrack(Int_t id, Int_t pdg, TObject* ptrParticle);
+  
+  //void InitTrack(Double_t *point[3],Double_t *dir[3]);
 	/*// getters
 	int Ndim() const {return ndim;}
 	double T() const {return x[0];}
