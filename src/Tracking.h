@@ -2,19 +2,24 @@
 #define __Tracking__
 
 #include "Geometry.h"
+#include <TParticle.h>
+#include "TVirtualGeoTrack.h"
 
 class Tracking : public Geometry{
 
 public:
-  // constructors and destructors
-  Tracking(Double_t *point, Double_t *dir);
-  ~Tracking();
-  const Double_t* GetCurPoint();
-  const Double_t* GetCurDir();
-  TGeoNode* GetCurState();
-  void AddTrack(Int_t id, Int_t pdg, TObject* ptrParticle);
-  
-  //void InitTrack(Double_t *point[3],Double_t *dir[3]);
+	// constructors and destructor
+	Tracking();
+	~Tracking();
+
+	void CrossNextBoundary(Double_t pstep);
+
+	void Propagation();
+
+	TGeoNode* DefinedStep(Double_t stepvalue);
+
+	void Drawing();
+
 	/*// getters
 	int Ndim() const {return ndim;}
 	double T() const {return x[0];}
@@ -35,7 +40,10 @@ public:
 	friend ostream& operator<<(ostream&, const ODEpoint&);*/
 
 protected:
-    
+
+	Double_t muon_step;
+	TVirtualGeoTrack *track;
+	//TParticle* Muon;
 };
 
 #endif

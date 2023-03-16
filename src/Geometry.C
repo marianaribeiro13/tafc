@@ -1,8 +1,6 @@
 #include "Geometry.h"
 
-Geometry::Geometry(Float_t h, Float_t r, Float_t d) : 
-height(h), 
-radius(r), 
+Geometry::Geometry(Float_t d) :  
 distance(d) {
 
     geom = new TGeoManager("telescope", "Telescope geometry");
@@ -15,13 +13,13 @@ distance(d) {
     TGeoMedium *Vacuum = new TGeoMedium("Vacuum",1, matVacuum);
     TGeoMedium *Al = new TGeoMedium("Root Material",2, matAl);
  
-    TGeoVolume *top = geom->MakeTube("TOP", Vacuum, 0, 50., 100.); // rmin, rmax, mid height
+    top = geom->MakeTube("TOP", Vacuum, 0, 200., 100.); // rmin, rmax, mid height
     geom->SetTopVolume(top);
 
-    TGeoTranslation *tr1 = new TGeoTranslation(0., 0., float(distance + height)/2.);
-    TGeoTranslation *tr2 = new TGeoTranslation(0., 0., float(distance + height)/2.);
+    TGeoTranslation *tr1 = new TGeoTranslation(0., 0., double(distance + 1.0)/2.);
+    TGeoTranslation *tr2 = new TGeoTranslation(0., 0., - double(distance + 1.0)/2.);
 
-    TGeoVolume *scintillator = geom->MakeTube("scintillator", Al, 0, radius, float(height)/2.); // rmin, rmax, mid height
+    TGeoVolume *scintillator = geom->MakeTube("scintillator", Al, 0, 5.0, 0.5); // rmin, rmax, mid height
     scintillator->SetLineColor(kBlue);
     top->AddNode(scintillator, 1, tr1);
     top->AddNode(scintillator, 2, tr2);
