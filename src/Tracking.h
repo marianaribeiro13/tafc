@@ -2,8 +2,9 @@
 #define __Tracking__
 
 #include "Geometry.h"
-#include <TParticle.h>
 #include "TVirtualGeoTrack.h"
+#include <vector>
+#include "Muon.h"
 
 class Tracking : public Geometry{
 
@@ -12,11 +13,11 @@ public:
 	Tracking();
 	~Tracking();
 
-	void CrossNextBoundary(Double_t pstep);
-
 	void Propagation();
 
-	TGeoNode* DefinedStep(Double_t stepvalue);
+	void DefinedStep(double stepvalue);
+
+	double CrossNextBoundary();
 
 	void Drawing();
 
@@ -41,9 +42,9 @@ public:
 
 protected:
 
-	Double_t muon_step;
-	TVirtualGeoTrack *track;
-	//TParticle* Muon;
+	double muon_step;
+	TVirtualGeoTrack* track;
+	Muon* muon;
 };
 
 #endif

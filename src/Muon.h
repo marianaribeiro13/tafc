@@ -1,30 +1,33 @@
-#ifndef __muon__
-#define __muon__
+#ifndef __Muon__
+#define __Muon__
 #include <cmath>
-#include "Geometry.h"
+#include <vector>
+#include "TObject.h"
 
-using namespace std;
-class muon
-{
+class Muon : public TObject{
 public:
-  muon(double energy, double* position, double *direction);
-  ~muon();
-  double GetEnergy(){return energy;};
-  double GetMass(){return mass;};
-  double GetAngle(){return angle;};
-  double* GetMomentum(){return momentum;};
-  double* GetPosition(){return position;};
-  bool
+  Muon(std::vector<double> x, double theta, double E);
+  ~Muon();
+  int GetPDG() {return pdg;};
+  double GetMomentum() {return momentum;};
+  double GetVelocity() {return velocity;};
+  double GetEnergy() {return energy;};
+  std::vector<double> GetPosition();
+  std::vector<double> GetDirection();
+  void ChangeEnergy(const double &E){ energy = E; };
+  void ChangeMomentum(){ momentum = sqrt(energy*energy - mass*mass); };
+  void ChangeVelocity(){ velocity = double(momentum)/energy; };
+  void ChangePosition(const std::vector<double> &x){ position = x; };
+  void ChangeDirection(const std::vector<double> &d){ direction = d; };
 
-
-protected:
-  double energy;
-  double angle;
+private:
+  int pdg;
   double mass = 105.6583755; //MeV
-  double momentum[3];
-  double position[3];
-
-
+  double energy;
+  double velocity;
+  double momentum;
+  std::vector<double> position; //Four position
+  std::vector<double> direction; //Direction
 
 };
 
