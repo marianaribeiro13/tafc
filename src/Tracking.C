@@ -10,7 +10,7 @@ Tracking::Tracking() : muon_step(0.001), Geometry(25.){
     //TObject* Muon = new TParticle(pdg,0,0,0,0,0,px,py,pz,E,vx,vy,vz,t);
 
     //double initial = double(distance + 1.0)/2.;
-    std::vector<double> x {0., 0., 0., double(distance + 1.0)/2.};
+    std::vector<double> x = tools::Generate_Position(5.0,distance,1.0);
 
     /*auto spec = [](double* p,double* par) {
 
@@ -44,15 +44,24 @@ Tracking::Tracking() : muon_step(0.001), Geometry(25.){
     
     //double momentum = ;
 
-    double Energy = 1.;
+    auto f = [](double *x,double *par)
+    {
+        return pow(cos(x[1]),3)*0.00253*pow(x[0]*cos(x[1]),-(0.2455+1.288*log10(x[0]*cos(x[1]))-0.255*pow(log10(x[0]*cos(x[1])),2)+0.0209*pow(log10(x[0]*cos(x[1])),3) ));
+    };
 
-    double theta = 2.9 * TMath::Pi()/3.;
+    TF1 *F = new TF1("f",f);
 
-    muon = new Muon(x, theta, Energy);
+    std::vector<double> aux = tools::Random_Distribution_2D(F,1,2000,0,M_PI/2,F->GetMaximum());
+
+    double Momentum = aux[0];
+
+    double theta = aux[1];
+
+    muon = new Muon(x, theta, Momentum);
 
     std::vector<double> d = muon->GetDirection();
 
-    geom->InitTrack(x[1], x[2], x[3], d[0], d[1], d[2]);
+    geom->InitTrack(x[0], x[1], x[2], d[0], d[1], d[2]);
 
     //Const Double_t *firstpoint = geom->GetCurrentPoint();*/
 
@@ -71,7 +80,7 @@ Tracking::Tracking() : muon_step(0.001), Geometry(25.){
     //Get pointer to current track
     track = geom->GetCurrentTrack();
     //Assign current 
-    track->AddPoint(x[1], x[2], x[3], x[0]);
+    track->AddPoint(x[0], x[1], x[2], 0);
 
 }
 
@@ -99,7 +108,7 @@ void Tracking::Propagation(){
 
             double E = muon->GetEnergy();
 
-            double dE = (-1)*alpha + (-1)*beta * E;
+            double dE = ((-1)*alpha + (-1)*beta * E)*muon_step;
 
             muon->ChangeEnergy(E-dE);
             muon->ChangeMomentum();
