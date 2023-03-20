@@ -3,6 +3,8 @@
 
 int main(){
 
+    srand(time(0));
+    
     Tracking Track;
 
     Track.Propagation();
