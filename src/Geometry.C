@@ -1,6 +1,6 @@
 #include "Geometry.h"
 
-Geometry::Geometry(Float_t d) :  
+Geometry::Geometry(double d) :  
 distance(d) {
 
     geom = new TGeoManager("telescope", "Telescope geometry");

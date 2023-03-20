@@ -11,7 +11,7 @@ class Geometry{
 
 public:
 	// constructors and destructor
-	Geometry(Float_t d = 0.);
+	Geometry(double d = 0.);
 	~Geometry();
 
 	/*// getters
@@ -37,7 +37,7 @@ protected:
     
     TGeoManager* geom; 
 	TGeoVolume* top;
-    Float_t distance; //Separation between scintillators
+    double distance; //Separation between scintillators
 };
 
 #endif
