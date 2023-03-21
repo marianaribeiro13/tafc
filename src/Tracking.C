@@ -7,13 +7,16 @@ using namespace std;
 Double_t alpha=0.0072974;
 Double_t I=64.70713358e-6; //MeV
 Double_t n=2.5587248e18; //MeV
+Double_t na = 6.02214179e23; // /cm^3
 Int_t Z=-1;
 Double_t mass_muon=105.6583755; //MeV
 Double_t mass_electron=0.51099895; //MeV
+Double_t dE=0;
+Double_t dx=1.e-4;
 
-Double_t dEdx_func(Double_t v)
+Double_t dEdx_func(Double_t v) //Mev/cm
 {
-  return (4*M_PI*n*Z*Z*alpha*alpha*(log((2*mass_electron*v*v)/(I*(1-v*v)))-v*v))/(mass_electron*v*v);
+  return (4*M_PI*na*Z*Z*alpha*alpha*(log((2*mass_electron*v*v)/(I*(1-v*v)))-v*v))/(mass_electron*v*v);
 }
 
 Tracking::Tracking() : muon_step(0.001), Geometry(25.){
@@ -111,9 +114,6 @@ void Tracking::Propagation(){
     while(!(geom->IsOutside())){
 
         //CrossNextBoundary(muon_step);
-      Double_t x=0;
-      Double_t dE=0;
-      Double_t dx=1.e-4;
         while(geom->IsSameLocation()){
             
             DefinedStep(muon_step);
