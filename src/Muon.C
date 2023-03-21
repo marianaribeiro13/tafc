@@ -9,7 +9,7 @@ Muon::Muon(std::vector<double> x, double theta, double E) : pdg(13), energy(E){
   direction.reserve(3);
   direction[0] = sin(theta);
   direction[1] = 0;
-  direction[2] = cos(theta);
+  direction[2] = -cos(theta);
 
   position.reserve(4);
   for(int i=0; i<4; i++) {
