@@ -31,7 +31,7 @@ double tools::Random_Distribution(double xmin,double xmax,TF1 *F)
   return x;
 }
 
-muon* tools::Generate_Muon(vector<double> Position)
+/* muon* tools::Generate_Muon(vector<double> Position)
 {
   vector<double> Direction(3);
   double angle = 0.5*M_PI * (double) rand()/RAND_MAX;
@@ -47,7 +47,7 @@ muon* tools::Generate_Muon(vector<double> Position)
   muon *M = new muon(energy,Position.data(),Direction.data());
 
   return M;
-}
+  } */
 
 double tools::Norm(vector<double> v)
 {

@@ -13,10 +13,10 @@ class tools{
 public:
   static vector<double> Generate_Vector(); //creates a random, normalized 3d vector
   static double Random_Distribution(double ,double ,TF1* ); //generates a random number according to a distribution
-  static  muon* Generate_Muon(vector<double>);
+  //static  muon* Generate_Muon(vector<double>);
   static vector<double> Generate_Position(double,double,double);
   static double Norm(vector<double>);
-  static vector<double> Random_Distribution_2D(TF1*,double,double,double,double,double); /
+  static vector<double> Random_Distribution_2D(TF1*,double,double,double,double,double);
   ~tools();
 
 };
