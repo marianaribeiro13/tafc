@@ -105,8 +105,8 @@ Tracking::~Tracking(){}
 
 void Tracking::Propagate(){
 
-    double alpha = 1.;
-    double beta = 1.;
+    //double alpha = 1.;
+    //double beta = 1.;
 
     //double v = 1.;
     double t = 0.;
@@ -114,6 +114,25 @@ void Tracking::Propagate(){
     while(!(geom->IsOutside())){
 
         //CrossNextBoundary(muon_step);
+
+        double air_step = CrossNextBoundary();
+
+        t += double(air_step)/(muon->GetVelocity());
+
+        const double *cpoint = geom->GetCurrentPoint();
+
+        track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2),t);
+
+        std::cout << "Enter Scintillator" << std::endl;
+
+        DefinedStep(0.000001);
+
+        Double_t x=0;
+        Double_t dE=0;
+        //Double_t dx=1.e-4;
+
+        //std::cout << geom->IsSameLocation() << std::endl;
+
         while(geom->IsSameLocation()){
             
             DefinedStep(muon_step);
@@ -124,25 +143,25 @@ void Tracking::Propagate(){
 
             double E = muon->GetEnergy();
 
-            dE=dEdx_func(v)*dx;
+            cout << E << endl;
+
+            //dE=dEdx_func(v)*muon_step;
+
+            //double dE = ((-1)*alpha + (-1)*beta * E)*muon_step;
 
             muon->ChangeEnergy(E-dE);
             muon->ChangeMomentum();
             muon->ChangeVelocity();
 
             const double *cpoint = geom->GetCurrentPoint();
-    
+
             //Assign the new position to the track
             track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2),t);
+            //}
+
         }
 
-        double vacuum_step = CrossNextBoundary();
-
-        t += double(vacuum_step)/(muon->GetVelocity());
-
-        const double *cpoint = geom->GetCurrentPoint();
-
-        track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2),t);
+        //std::cout << "Air" << std::endl;
 
     }
 }
