@@ -32,7 +32,7 @@ $(LIBDIR)/libFC.a: $(OBJ)
 	ar ruv $@ $^
 	ranlib $@
 
-%.exe: $(BINDIR)/%.o $(LIBDIR)/libFC.a 
+$(BINDIR)/%.exe: $(BINDIR)/%.o $(LIBDIR)/libFC.a 
 	@echo compilink and linking... 
 	$(CC) -I src $< -o $(BINDIR)/$@ -L lib -l FC $(ROOTLIB) -lGeom
 
