@@ -7,9 +7,9 @@ int main(){
     
     Tracking Track;
 
-    Track.Propagation();
+    Track.Propagate();
 
-    Track.Drawing();
+    Track.Draw();
 
     return 0;
 }
