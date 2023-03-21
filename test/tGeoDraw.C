@@ -15,13 +15,14 @@ int main(){
   // generate cosmic muon
   
   Track.AddParticle(...);
-  
-  // propagate particles
-    Track.Propagate();
   */
   
+  // propagate particles
+  Track.Propagate();
+
+  
   // display
-  TApplication A(nullptr, nullptr);
+  TApplication A("A", nullptr, nullptr);
   Track.Draw();
   A.Run();
   
