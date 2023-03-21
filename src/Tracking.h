@@ -14,13 +14,13 @@ public:
 	Tracking();
 	~Tracking();
 
-	void Propagation();
+	void Propagate();
 
 	void DefinedStep(double stepvalue);
 
 	double CrossNextBoundary();
 
-	void Drawing();
+	void Draw();
 
 	/*// getters
 	int Ndim() const {return ndim;}

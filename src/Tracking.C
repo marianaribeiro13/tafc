@@ -103,7 +103,7 @@ Tracking::Tracking() : muon_step(0.001), Geometry(25.){
 
 Tracking::~Tracking(){}
 
-void Tracking::Propagation(){
+void Tracking::Propagate(){
 
     double alpha = 1.;
     double beta = 1.;
@@ -181,7 +181,7 @@ void Tracking::DefinedStep(double stepvalue){
 
 }
 
-void Tracking::Drawing(){
+void Tracking::Draw(){
 
     TCanvas *c1 = new TCanvas("c1","c1");
     c1->cd();
