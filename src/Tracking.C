@@ -123,7 +123,7 @@ void Tracking::Propagate(){
 
         track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2),t);
 
-        std::cout << "Enter Scintillator" << std::endl;
+        //std::cout << "Enter Scintillator" << std::endl;
 
         DefinedStep(0.000001);
 
@@ -145,7 +145,7 @@ void Tracking::Propagate(){
 
             cout << E << endl;
 
-            //dE=dEdx_func(v)*muon_step;
+            dE=dEdx_func(v)*muon_step;
 
             //double dE = ((-1)*alpha + (-1)*beta * E)*muon_step;
 
