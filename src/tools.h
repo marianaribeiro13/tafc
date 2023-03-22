@@ -17,9 +17,9 @@ using namespace std;
 class tools{
 public:
 
-  static double Norm(vector<double>);
-  static vector<string> Read_File(string);
-  static TSpline3* Interpolate_Photon_Spectrum(string);
+  static double Norm(vector<double>);   //returns the norm of a vector
+  static vector<string> Read_File(string); //Reads a file to a vector of strings
+  static TSpline3* Interpolate_Photon_Spectrum(string); //Receives a filename and outputs an interpolation
   ~tools();
 
 
