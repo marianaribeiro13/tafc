@@ -73,7 +73,7 @@ double Generator::Generate_Photon_Energy(TSpline3* F)
     x = Random->Uniform(380,500);
     y = Random->Uniform(1);
   }
-  return x;
+  return (6.626e-34*2.998e8)/(x*1e-9)/1.602e-19; //Convert to eV
 }
 
 int Generator::Generate_Photon_Number(double expected)
