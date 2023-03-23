@@ -1,9 +1,9 @@
 #include "Muon.h"
 
 //Considering only muons in the x-z plane
-Muon::Muon(std::vector<double> x, double theta, double E) : pdg(13), energy(E){
+Muon::Muon(std::vector<double> x, double theta, double P) : pdg(13), momentum(P){
   
-  momentum = sqrt(energy*energy - mass*mass); //c=1
+  energy = sqrt(momentum*momentum + mass*mass); //c=1
   velocity = double(momentum)/energy; //c=1
 
   direction.reserve(3);
@@ -11,8 +11,8 @@ Muon::Muon(std::vector<double> x, double theta, double E) : pdg(13), energy(E){
   direction[1] = 0;
   direction[2] = -cos(theta);
 
-  position.reserve(4);
-  for(int i=0; i<4; i++) {
+  position.reserve(3);
+  for(int i=0; i<3; i++) {
     position[i]= x[i];
   }
 
