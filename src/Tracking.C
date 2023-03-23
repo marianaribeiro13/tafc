@@ -4,22 +4,42 @@
 #include <cmath>
 
 using namespace std;
+//NATURAL
 Double_t alpha=0.0072974;
-Double_t I=64.70713358e-6; //MeV
+Double_t I1=64.70713358e-6; //MeV
 Double_t n=2.5587248e18; //MeV
-Double_t na = 6.02214179e23; // /cm^3
 Int_t Z=-1;
 Double_t mass_muon=105.6583755; //MeV
 Double_t mass_electron=0.51099895; //MeV
 Double_t dE=0;
 Double_t dx=1.e-4;
 
-Double_t dEdx_func(Double_t v) //Mev/cm
+//S.I.
+Double_t c = 299792458;
+Double_t mp = 1.672621637e-27;
+Double_t me = 9.1093821499999992e-31;
+Double_t qe = 1.602176487e-19;
+Double_t na = 6.02214179e23;
+Double_t eps0 = 8.854187817e-12;
+Double_t n_density=3.33e29; // per m^3
+Double_t I = 1.03660828e-17;
+
+Double_t dEdx_nat(Double_t v) //Mev/cm
 {
-  return (4*M_PI*na*Z*Z*alpha*alpha*(log((2*mass_electron*v*v)/(I*(1-v*v)))-v*v))/(mass_electron*v*v);
+  return (4*M_PI*n*Z*Z*alpha*alpha*(log((2*mass_electron*v*v)/(I1*(1-v*v)))-v*v))/(mass_electron*v*v);
 }
 
+Double_t dEdx_func(Double_t beta) //S.I.
+{
+  Double dE_SI;
+  dE_SI = (qe*qe*qe*qe*n_density*Z*Z*(log((2*me*c*c*beta*beta)/(I*(1-beta*beta)))-beta*beta))/(4*M_PI*eps0*eps0*me*c*c*beta*beta);
+  dE_SI=dE_SI/(1.602e-13);
+  return dE_SI;
+}  
+
 Tracking::Tracking() : muon_step(0.001), Geometry(25.){
+
+  Generator* G= Generator();
 
     // Setting both initial point and direction and finding the state:
     // gGeoManager->SetCurrentPoint(x,y,z) + gGeoManager->SetCurrentDirection(nx,ny,nz) + gGeoManager->FindNode()
@@ -27,7 +47,7 @@ Tracking::Tracking() : muon_step(0.001), Geometry(25.){
     //TObject* Muon = new TParticle(pdg,0,0,0,0,0,px,py,pz,E,vx,vy,vz,t);
 
     //double initial = double(distance + 1.0)/2.;
-    std::vector<double> x = tools::Generate_Position(5.0,distance,1.0);
+    std::vector<double> x = G->Generate_Position(5.0,distance,1.0);
 
     /*auto spec = [](double* p,double* par) {
 
@@ -60,7 +80,6 @@ Tracking::Tracking() : muon_step(0.001), Geometry(25.){
     IntegratorMC I(MuonSpectrum);*/
     
     //double momentum = ;
-
     auto f = [](double *x,double *par)
     {
         return pow(cos(x[1]),3)*0.00253*pow(x[0]*cos(x[1]),-(0.2455+1.288*log10(x[0]*cos(x[1]))-0.255*pow(log10(x[0]*cos(x[1])),2)+0.0209*pow(log10(x[0]*cos(x[1])),3) ));
@@ -68,7 +87,7 @@ Tracking::Tracking() : muon_step(0.001), Geometry(25.){
 
     TF1 *F = new TF1("f",f);
 
-    std::vector<double> aux = tools::Random_Distribution_2D(F,1,2000,0,M_PI/2,F->GetMaximum());
+    std::vector<double> aux = G->Random_Distribution_2D(F,1,2000,0,M_PI/2,F->GetMaximum());
 
     double Momentum = aux[0];
 
