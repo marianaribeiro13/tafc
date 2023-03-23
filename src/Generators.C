@@ -3,6 +3,12 @@
 Generator::Generator()
 {
    Random = new TRandom(time(0));
+   auto f = [](double *x,double *par)
+   {
+       return pow(cos(x[1]),3)*0.00253*pow(x[0]*cos(x[1]),-(0.2455+1.288*log10(x[0]*cos(x[1]))-0.255*pow(log10(x[0]*cos(x[1])),2)+0.0209*pow(log10(x[0]*cos(x[1])),3) ));
+   };
+   Momentum_Distribution = new TF1("f",f);
+   Photon_Spectrum = tools::Interpolate_Photon_Spectrum("Photon_Spectrum.txt");
 }
 
 Generator::~Generator(){};
@@ -36,8 +42,9 @@ double Generator::Random_Distribution(double xmin,double xmax,TF1 *F)
   return x;
 }
 
-vector<double> Generator::Generate_Position(double R,double d,double h)
+vector<double> Generator::Generate_Position(double d)
 {
+    double h=1,R=5.;
     vector<double> aux(3);
     aux[2] = d/2+h;
     double r = Random->Uniform(0,R);
@@ -63,12 +70,12 @@ vector<double> Generator::Random_Distribution_2D(TF1* F,double xmin,double xmax,
     return x;
 }
 
-double Generator::Generate_Photon_Energy(TSpline3* F)
+double Generator::Generate_Photon_Energy()
 {
   double x = Random->Uniform(380,500);
   double y = Random->Uniform(1);
 
-  while(y>F->Eval(x))
+  while(y>Photon_Spectrum->Eval(x))
   {
     x = Random->Uniform(380,500);
     y = Random->Uniform(1);
@@ -80,3 +87,21 @@ int Generator::Generate_Photon_Number(double expected)
 {
   return Random->Poisson(expected);
 }
+
+// Muon* Generator::Generate_Muon(double distance)
+// {
+//   vector<double> aux = Random_Distribution_2D(Momentum_Distribution,1,2000,0,M_PI/2.,Momentum_Distribution->GetMaximum());
+//   vector<double> direction(3);
+//   direction[2] = -cos(aux[1]);
+//   double aux0 = Random->Uniform(-1,1), aux1 = Random->Uniform(-1,1);
+//   direction[0] = aux0*sqrt((1-direction[2]*direction[2])/(aux0*aux0+aux1*aux1));
+//   direction[1] = aux1*sqrt((1-direction[2]*direction[2])/(aux0*aux0+aux1*aux1));
+//   Muon *M = new Muon(Generate_Position(distance),direction,1000*aux[0]);
+//   return M;
+// }
+//
+// Photon* Generator::Generate_Photon(vector<double> x)
+// {
+//
+//   return new Photon(x,Generate_Vector(),Generate_Photon_Energy());
+// }
