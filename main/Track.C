@@ -5,11 +5,11 @@ int main(){
 
     srand(time(0));
     
-    Tracking Track;
+    auto Track= new Tracking();
 
-    Track.Propagate();
+    Track->Propagate();
 
-    Track.Draw();
+    Track->Draw();
 
     return 0;
 }
