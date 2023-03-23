@@ -26,5 +26,3 @@ distance(d) {
 
     geom->CloseGeometry();
 }
-
-Geometry::~Geometry(){}

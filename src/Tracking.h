@@ -4,48 +4,36 @@
 #include "Geometry.h"
 #include "TVirtualGeoTrack.h"
 #include <vector>
-#include "Muon.h"
-#include "tools.h"
+#include "Particle.h"
+#include "Generators.h"
 
 class Tracking : public Geometry{
 
 public:
 	// constructors and destructor
-	Tracking();
-	~Tracking();
+	Tracking(double distance, double step, Generator* g);
+	~Tracking() = default;
 
-	void Propagate();
+	//Add track associated to a particle to the geometry
+	int AddParticle(int const id, vector<double> x, Particle* particle);
 
-	void DefinedStep(double stepvalue);
+	//Propagate track associated to particle
+	void Propagate(int track_index);
 
-	double CrossNextBoundary();
+	//Check material where the particle is propagating
+	TGeoMaterial* CheckMaterial();
+
+	//Calculate energy lost by the particle in small step, when interacting with the material
+	double BetheBloch(double v, double step);
+
+	Particle* GenerateCosmicMuon();
 
 	void Draw();
 
-	/*// getters
-	int Ndim() const {return ndim;}
-	double T() const {return x[0];}
-	double X(int i) const {return x[i+1];}
-	double* GetArray() {return x;}
-
-	// operators
-	ODEpoint operator*(double) const;
-	ODEpoint operator+(const ODEpoint&) const;
-	ODEpoint operator-(const ODEpoint&) const;
-
-	void operator=(const ODEpoint&);
-
-	const double& operator[] (int) const;
-	double& operator[] (int);
-
-	// print
-	friend ostream& operator<<(ostream&, const ODEpoint&);*/
-
 protected:
 
-	double muon_step;
-	TVirtualGeoTrack* track;
-	Muon* muon;
+	double stepvalue; //standard propagation step value
+	Generator* generator;
 };
 
 #endif

@@ -27,6 +27,22 @@ vector<double> Generator::Generate_Vector()
   return v;
 }
 
+vector<double> Generator::Generate_Direction_From_Theta(double theta) {
+
+  vector<double> d(3);
+
+  d[2] = -cos(theta); // z direction according to theta
+
+  //generate 2 random numbers between 0 and 1
+  double aux0 = Uniform(-1,1), aux1= Uniform(-1,1);
+
+  //generate x and y direction normalized
+  d[0] = aux0*(double)sqrt((1-d[2]*d[2])/(aux0*aux0+aux1*aux1)); // x direction
+  d[1] = aux1*(double)sqrt((1-d[2]*d[2])/(aux0*aux0+aux1*aux1)); // y direction
+  
+  return d;
+}
+
 double Generator::Random_Distribution(double xmin,double xmax,TF1 *F)
 {
   double x = Random->Uniform(xmin,xmax);
