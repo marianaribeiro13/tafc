@@ -18,12 +18,10 @@ Particle::Particle(int const PDG,  double p, std::vector<double> const& d) : pdg
     //Convert mass to MeV
     mass = m*1000;
 
-    std::cout << "Mass: " << mass << std::endl;
-  
     //Compute energy in natural units
     energy = sqrt(momentum*momentum + mass*mass); //c=1
 
-    direction = d; 
+    direction = d;
 
 }
 

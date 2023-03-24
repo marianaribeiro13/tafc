@@ -19,11 +19,13 @@ public:
   Particle* Generate_Photon();
   TF1* GetMomentumDistribution(){return Momentum_Distribution;};
   double Uniform(double xmin,double xmax){return Random->Uniform(xmin,xmax);};
+  double Generate_Photon_Step();
   ~Generator();
 
 private:
   TRandom *Random;
   TF1 *Momentum_Distribution;
+  TF1 *Absorbtion_Probability;
   TSpline3 *Photon_Spectrum;
 };
 
