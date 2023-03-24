@@ -4,8 +4,11 @@
 
 ////////////////////////// Constructor ////////////////////////////////////////
 
-Tracking::Tracking(double distance, double step, Generator* g) : Geometry(distance), stepvalue(step){
+Tracking::Tracking(double radius, double height, double distance, double airgap, double althickness, double step, Generator* g) : Geometry(), stepvalue(step){
+    
     generator = g;
+
+    Build_MuonTelescope(radius, height, distance, airgap, althickness);
 }
 
 
@@ -13,6 +16,8 @@ Tracking::Tracking(double distance, double step, Generator* g) : Geometry(distan
 
 //Adds track associated to particle (give initial position)
 int Tracking::AddParticle(int const id, vector<double> x, Particle* particle){
+
+    std::cout << "Aquiii" << std::endl;
 
     //Create Track associated to particle
     int track_index = geom->AddTrack(id, particle->GetPDG(), particle); //track id, particle pdg, pointer to particle
@@ -296,7 +301,7 @@ void Tracking::Draw(){
     TCanvas *c1 = new TCanvas("c1","c1");
     c1->cd();
     //top->Draw("ogle");
-    top->Draw();
+    geom->GetTopVolume()->Draw();
     geom->DrawTracks("/*");
     //geom->AnimateTracks(0, 1000, 200, "/* /G /S");
     c1->SaveAs("Drawing.pdf");

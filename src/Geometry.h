@@ -12,14 +12,15 @@ class Geometry{
 public:
 
 	// constructors and destructor
-	Geometry(double d = 0.);
-	virtual ~Geometry(){std::cout<< "Destruct Geometry" << std::endl;};
+	Geometry();
+	virtual ~Geometry() = default;
+
+	// Build Telescope methods
+	void Build_MuonTelescope(double radius, double height, double distance,  double airgap, double althickness); // radius and height of scintillator and distance between scintillators
 
 protected:
     
-    TGeoManager* geom; 
-	TGeoVolume* top;
-    double distance; //Separation between scintillators
+    TGeoManager* geom; //Manager pointer to geometry
 };
 
 #endif

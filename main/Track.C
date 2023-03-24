@@ -5,13 +5,15 @@ int main(){
 
     Generator* gen = new Generator();
 
+    double radius = 5.0;
+    double height = 1.0;
     double distance = 25.;
+    double airgap = 0.1;
+    double althickness = 0.3;
     double step = 0.001;
     
     //Define geometry and tracking step
-    Tracking Simulation(distance, step, gen);
-
-    //std::cout << "Aquiii" << std::endl;
+    Tracking Simulation(radius, height, distance, airgap, althickness, step, gen);
 
     //Generate random incident muon
     Particle* muon = gen->Generate_CosmicMuon();

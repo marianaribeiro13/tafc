@@ -11,7 +11,7 @@ class Tracking : public Geometry{
 
 public:
 	// constructors and destructor
-	Tracking(double distance, double step, Generator* g);
+	Tracking(double radius, double height, double distance, double airgap, double althickness, double step, Generator* g);
 	~Tracking() = default;
 
 	//Add track associated to a particle to the geometry
