@@ -20,7 +20,7 @@ distance(d) {
     TGeoTranslation *tr2 = new TGeoTranslation(0., 0., - double(distance + 1.0)/2.);
 
     TGeoVolume *scintillator = geom->MakeTube("scintillator", Al, 0, 5.0, 0.5); // rmin, rmax, mid height
-    scintillator->SetLineColor(kBlue);
+    scintillator->SetLineColor(kBlack);
     top->AddNode(scintillator, 1, tr1);
     top->AddNode(scintillator, 2, tr2);
 

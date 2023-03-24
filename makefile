@@ -5,9 +5,9 @@ LIBDIR := lib
 
 CCFLAGS := -pedantic
 
-CC := g++ -std=c++17 
+CC := g++ -std=c++11
 
-# src/ (declarcaoes de funcoes, de calsses + codigo)
+# src/ (declaracoes de funcoes, de classes + codigo)
 # main/ (programas principais)
 # bin/ (temporarios, .o, .exe)
 # lib/ (bibliotecas) biblioteca FC
@@ -32,28 +32,21 @@ $(LIBDIR)/libFC.a: $(OBJ)
 	ar ruv $@ $^
 	ranlib $@
 
-$(BINDIR)/%.exe: $(BINDIR)/%.o $(LIBDIR)/libFC.a 
+%.exe: $(BINDIR)/%.o $(LIBDIR)/libFC.a 
 	@echo compilink and linking... 
-	$(CC) -I src $< -o $(BINDIR)/$@ -L lib -l FC $(ROOTLIB) -lGeom
+	$(CC) -I src $< -o $(BINDIR)/$@ -L lib -l FC $(ROOTLIB) -lGeom -lEG
 
 $(BINDIR)/%.o: %.C | $(INC)
 	@echo compiling... $<
 	$(CC) -I src -I $(ROOTINC) -c $< -o $@
-
-main:
-	@echo Making main.exe...
-	make main.exe
-
 
 
 ######### clean
 
 tilde := $(wildcard */*~) $(wildcard *~)
 exe := $(wildcard */*.exe) $(wildcard *.exe)
-obj := $(wildcard */*.o) $(wildcard *.o)  $(wildcard */*.pcm) $(wildcard */*.d)
-mylibs := $(wildcard */*.so) $(wildcard */*.a)
+obj := $(wildcard */*.o) $(wildcard *.o) $(wildcard */*.so) $(wildcard */*.pcm) $(wildcard */*.d)
 
 clean:
 	@echo cleaning dir...
-	rm -f $(exe) $(obj) $(tilde) $(mylibs)
-
+	rm -f $(exe) $(obj) $(tilde) $(LIBDIR)/libFC.a	

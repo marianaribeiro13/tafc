@@ -13,8 +13,7 @@ double tools::Norm(vector<double> v)
   return sqrt(n);
 }
 
-vector<string> tools::Read_File(string name)
-{
+vector<string> tools::Read_File(string name){
   fstream fp;
   string aux;
   fp.open(name.c_str());
@@ -36,8 +35,7 @@ vector<string> tools::Read_File(string name)
   exit(0);
 }
 
-TSpline3* tools::Interpolate_Photon_Spectrum(string name)
-{
+TSpline3* tools::Interpolate_Photon_Spectrum(string name){
   vector<string> fs = tools::Read_File(name.c_str());
   vector<double> x,y;
   for(int i=0;i<fs.size();i++)

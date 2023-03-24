@@ -14,7 +14,7 @@ int main(){
     //std::cout << "Aquiii" << std::endl;
 
     //Generate random incident muon
-    Particle* muon = Simulation.GenerateCosmicMuon();
+    Particle* muon = gen->Generate_CosmicMuon();
 
     //Particle* muon2 = Simulation.GenerateCosmicMuon();
 

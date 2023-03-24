@@ -1,12 +1,15 @@
 #include "Tracking.h"
 #include "TCanvas.h"
-#include "TMath.h"
 
 
 ////////////////////////// Constructor ////////////////////////////////////////
+
 Tracking::Tracking(double distance, double step, Generator* g) : Geometry(distance), stepvalue(step){
     generator = g;
 }
+
+
+///////////////////////// Add Particle function //////////////////////////////
 
 //Adds track associated to particle (give initial position)
 int Tracking::AddParticle(int const id, vector<double> x, Particle* particle){
@@ -23,6 +26,8 @@ int Tracking::AddParticle(int const id, vector<double> x, Particle* particle){
     return track_index;
 }
 
+
+/////////////////////////// Propagate Massive particle function //////////////////////////////
 
 void Tracking::Propagate(int track_index){
 
@@ -60,13 +65,15 @@ void Tracking::Propagate(int track_index){
             //std::cout << part->GetEnergy() << std::endl;
 
             //Get the step taken
-            double snext  = gGeoManager->GetStep();
+            double step_vac  = geom->GetStep();
+
+            std::cout << "Step to cross boundary in vacuum: " << step_vac << std::endl;
 
             //Compute velocity
             double v = (double)(part->GetMomentum())/(part->GetEnergy());
 
             //Compute time
-            t += double(snext)/v;
+            t += double(step_vac)/v;
 
             //Get new position of the particle after making the step
             const double *cpoint = geom->GetCurrentPoint();
@@ -79,39 +86,30 @@ void Tracking::Propagate(int track_index){
             std::cout << "Inside scintilator" << endl;
 
             //Get current particle position in the geometry
-            const double *ipoint = geom->GetCurrentPoint();
-            //Get current particle direction of propagation
-            const double *idir = geom->GetCurrentDirection();
+            const double *cpoint = geom->GetCurrentPoint(); //cpoint always points to the current position
 
-            int nsteps = 0;
+            //Number of arbitrary steps inside material
+            int nsteps = 1;
 
-            while(geom->IsSameLocation(*ipoint + nsteps*stepvalue*(*idir), *(ipoint+1) + nsteps*stepvalue*(*(idir+1)), *(ipoint+2) + nsteps*stepvalue*(*(idir+2)))){
+            while(geom->IsSameLocation(*cpoint + stepvalue*d[0], *(cpoint+1) + stepvalue*d[1], *(cpoint+2) + stepvalue*d[2])){
                 
-                //std::cout << "Step " << nsteps << std::endl;
                 //Set arbitrary step
                 geom->SetStep(stepvalue);
 
                 //Execute step (flag = kFALSE means it is an arbitrary step, not limited by geometrical reasons)
                 geom->Step(kFALSE);
 
-                //Compute particle velocity
-                double v = (double)(part->GetMomentum())/(part->GetEnergy());
+                //Get energy before step
+                double E = part->GetEnergy();
 
-                //std::cout << v << std::endl;
+                //Compute particle velocity
+                double v = (double)(part->GetMomentum())/E;
 
                 //Compute propagation time
                 t += double(stepvalue)/v;
 
-                //Get new position of the particle after making the step
-                const double *npoint = geom->GetCurrentPoint();
-
                 //Add new point to the particle track
-                track->AddPoint(*npoint, *(npoint+1), *(npoint+2),t);
-
-                //Get energy before step
-                double E = part->GetEnergy();
-
-                std::cout << "Energy step " << nsteps << ": " << E << std::endl;
+                track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2),t);
 
                 //Calculate energy lost to the material
                 double dE = BetheBloch(v, stepvalue);
@@ -125,37 +123,68 @@ void Tracking::Propagate(int track_index){
                 double p = part->CalculateMomentum(E-dE);
                 part->ChangeMomentum(p);
 
-                nsteps++;
-            }
+                //Get number of photons from Poisson distribution (approximatly 1 photon per 100 eV)
+                int nphotons = generator->Generate_Photon_Number(dE*10000);
+
+                //Save current position in vector
+                vector<double> pos {*cpoint, *(cpoint+1), *(cpoint+2)};
                 
+                if(nsteps == 100){
+
+                    std::cout << "Number of photons in step " << nsteps << ": " << nphotons << std::endl;
+
+                    for(int i = 0; i < nphotons; i++){
+
+                        //int photon_index = AddParticle(i+1, pos, generator->Generate_Photon());
+
+                        //generate photon according to Scintillator spectrum
+                        Particle* photon = generator->Generate_Photon();
+
+                        //Create secondary Track associated to photon
+                        TVirtualGeoTrack* DaughterTrack = track->AddDaughter(i, photon->GetPDG(), photon); //track id, particle pdg, pointer to particle
+
+                        //Assign initial position to the track
+                        DaughterTrack->AddPoint(pos[0], pos[1], pos[2], t);
+                
+                        PropagatePhoton(DaughterTrack, t);
+                    }
+
+                }
+
+                geom->SetCurrentTrack(track_index);
+
+                geom->InitTrack(pos.data(), d.data());
+
+                ++nsteps;
+            }
+
             //Make step to the next boundary and cross it
-            geom->FindNextBoundaryAndStep();
+            geom->FindNextBoundaryAndStep(stepvalue);
 
             //Get the step taken
-            double snext  = gGeoManager->GetStep();
-
-            //Compute velocity
-            double v = (double)(part->GetMomentum())/(part->GetEnergy());
-
-            //Compute time
-            t += double(snext)/v;
-
-            //Get new position of the particle after making the step
-            const double *cpoint = geom->GetCurrentPoint();
-
-            //Add new point to the particle track
-            track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
+            double step_mat  = geom->GetStep();
 
             //Get energy before step
             double E = part->GetEnergy();
 
-            //Calculate energy lost to the material
-            double dE = BetheBloch(v, snext);
+            //Compute velocity
+            double v = (double)(part->GetMomentum())/E;
 
-            std::cout << "Step to cross boundary: " << snext << std::endl;
+            //Compute time
+            t += double(step_mat)/v;
+
+            //Add new point to the particle track
+            track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
+
+            //Calculate energy lost to the material
+            double dE = BetheBloch(v, step_mat);
+
+            std::cout << "Step to cross boundary inside scintillator: " << step_mat << std::endl;
 
             //Update particle energy
             part->ChangeEnergy(E-dE);
+
+            //std::cout << part->GetEnergy() << std::endl;
 
             //Update particle momentum
             double p = part->CalculateMomentum(E-dE);
@@ -164,6 +193,51 @@ void Tracking::Propagate(int track_index){
         }
     }
 }
+
+
+//////////////////////////////////// Propagate Photon function ///////////////////////////////
+
+void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
+
+    //Set the given track as the current track
+    geom->SetCurrentTrack(track);
+
+    //Get particle associated to track
+    Particle* part = new Particle(dynamic_cast<Particle*>(track->GetParticle()));
+
+    //Get particle direction
+    std::vector<double> d = part->GetDirection();
+
+    //Setting both initial point and direction and finding the state
+    geom->InitTrack(track->GetFirstPoint(), d.data());
+
+    //Get new position of the particle after making the step
+    const double *cpoint = geom->GetCurrentPoint();
+
+    while(!(geom->IsOutside())){
+
+        //Make step to the next boundary and cross it
+        geom->FindNextBoundaryAndStep();
+
+        //Get the step taken
+        double snext  = geom->GetStep();
+
+        //std::cout << "Photon Step to cross boundary in vacuum: " << snext << std::endl;
+
+        //Compute velocity
+        double v = 1/1.58;
+
+        //Compute time
+        t += double(snext)/v;
+
+        //Add new point to the particle track
+        track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
+
+    }
+}
+
+
+//////////////////////////////////// Check current material /////////////////////////////
 
 TGeoMaterial* Tracking::CheckMaterial(){
 
@@ -179,6 +253,9 @@ TGeoMaterial* Tracking::CheckMaterial(){
     return cmat;
 }
 
+
+////////////////////////////////////// Bethe Bloch function to calculate energy loss in material //////////////////////////////////
+
 double Tracking::BetheBloch(double v, double step){
 
     //NATURAL
@@ -189,7 +266,7 @@ double Tracking::BetheBloch(double v, double step){
     //Double_t mass_muon=105.6583755; //MeV
     //Double_t mass_electron=0.51099895; //MeV
     //Double_t dE=0;
-    Double_t dx=1.e-4;
+    //Double_t dx=1.e-4;
 
     //S.I.
     Double_t c = 299792458;
@@ -206,43 +283,13 @@ double Tracking::BetheBloch(double v, double step){
     double dEdx_SI = (qe*qe*qe*qe*n_density*Z*Z*(log((2*me*c*c*v*v)/(I*(1-v*v)))-v*v))/(4*M_PI*eps0*eps0*me*c*c*v*v);
     dEdx_SI = dEdx_SI/(1.602e-13);
 
-    double dE_SI = dEdx_SI * step;
+    double dE_SI = dEdx_SI * step/100;
 
     return dE_SI;
 }
 
-Particle* Tracking::GenerateCosmicMuon(){
 
-    //2D Spectrum of the muon (x[0] is the momentum and x[1] is the incident angle)
-   /* auto f = [](double *x,double *par)
-    {
-        return pow(cos(x[1]),3)*0.00253*pow(x[0]*cos(x[1]),-(0.2455+1.288*log10(x[0]*cos(x[1]))-0.255*pow(log10(x[0]*cos(x[1])),2)+0.0209*pow(log10(x[0]*cos(x[1])),3) ));
-    };
-
-    //Create TF1 function with the 2D spectrum of the muon
-    TF1 *F = new TF1("f",f);*/
-
-    //Generate random momentum and incident angle according to 2D pdf using acceptance-rejection
-    std::vector<double> aux = generator->Random_Distribution_2D(generator->GetMomentumDistribution(),1,2000,0, TMath::Pi()/2,generator->GetMomentumDistribution()->GetMaximum());
-
-    //Get momentum in MeV
-    //double Momentum = aux[0]*1000;
-
-    //Get incident angle
-    //double theta = aux[1];
-
-    //Get muon direction from the incident angle and a random generation on xy plane
-    //vector<double> d = generator->Generate_Direction_From_Theta(aux[1]);
-
-    //Create muon (pdg = 13)
-    Particle* muon = new Particle(13, aux[0]*1000, generator->Generate_Direction_From_Theta(aux[1]));
-
-    
-    //std::cout << muon->GetEnergy() << std::endl;
-    //std::cout << "Momentum: " << aux[0]*1000 << std::endl;
-
-    return muon;
-}
+////////////////////////////////////////////////// Draw geometry and tracks function //////////////////////////////////////
 
 void Tracking::Draw(){
 

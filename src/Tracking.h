@@ -20,13 +20,13 @@ public:
 	//Propagate track associated to particle
 	void Propagate(int track_index);
 
+	void PropagatePhoton(TVirtualGeoTrack* track, double t);
+
 	//Check material where the particle is propagating
 	TGeoMaterial* CheckMaterial();
 
 	//Calculate energy lost by the particle in small step, when interacting with the material
 	double BetheBloch(double v, double step);
-
-	Particle* GenerateCosmicMuon();
 
 	void Draw();
 
