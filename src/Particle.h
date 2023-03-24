@@ -31,7 +31,7 @@ public:
   double CalculateEnergy(double p){return sqrt(p*p+mass*mass);};
 
 private:
-  
+
   int pdg; //Particle PDG
   double mass; //mass in MeV
   double energy; //Energy in MeV

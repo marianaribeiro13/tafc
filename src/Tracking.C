@@ -97,7 +97,7 @@ void Tracking::Propagate(int track_index){
             int nsteps = 1;
 
             while(geom->IsSameLocation(*cpoint + stepvalue*d[0], *(cpoint+1) + stepvalue*d[1], *(cpoint+2) + stepvalue*d[2])){
-                
+
                 //Set arbitrary step
                 geom->SetStep(stepvalue);
 
@@ -133,7 +133,7 @@ void Tracking::Propagate(int track_index){
 
                 //Save current position in vector
                 vector<double> pos {*cpoint, *(cpoint+1), *(cpoint+2)};
-                
+
                 if(nsteps == 100){
 
                     std::cout << "Number of photons in step " << nsteps << ": " << nphotons << std::endl;
@@ -150,7 +150,7 @@ void Tracking::Propagate(int track_index){
 
                         //Assign initial position to the track
                         DaughterTrack->AddPoint(pos[0], pos[1], pos[2], t);
-                
+
                         PropagatePhoton(DaughterTrack, t);
                     }
 
@@ -207,36 +207,68 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
     //Set the given track as the current track
     geom->SetCurrentTrack(track);
 
-    //Get particle associated to track
-    Particle* part = new Particle(dynamic_cast<Particle*>(track->GetParticle()));
-
-    //Get particle direction
-    std::vector<double> d = part->GetDirection();
-
     //Setting both initial point and direction and finding the state
-    geom->InitTrack(track->GetFirstPoint(), d.data());
+    geom->InitTrack(track->GetFirstPoint(), dynamic_cast<Particle*>(track->GetParticle())->GetDirection().data());
 
     //Get new position of the particle after making the step
-    const double *cpoint = geom->GetCurrentPoint();
+    //const double *cpoint = geom->GetCurrentPoint();
 
-    while(!(geom->IsOutside())){
+    while(!(geom->IsOutside()))
+    {
+        if(CheckMaterial()->GetDensity()==0) //Vacuum
+        {
 
-        //Make step to the next boundary and cross it
-        geom->FindNextBoundaryAndStep();
+            //Make step to the next boundary and cross it
+            geom->FindNextBoundaryAndStep();
 
-        //Get the step taken
-        double snext  = geom->GetStep();
+            //Get the step taken
+            //double snext  = geom->GetStep();
 
-        //std::cout << "Photon Step to cross boundary in vacuum: " << snext << std::endl;
+            //std::cout << "Photon Step to cross boundary in vacuum: " << snext << std::endl;
 
-        //Compute velocity
-        double v = 1/1.58;
+            //Compute velocity
+            double v = 1/1.58;
 
-        //Compute time
-        t += double(snext)/v;
+            //Compute time
+            t += double(geom->GetStep())/v;
 
-        //Add new point to the particle track
-        track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
+            //Add new point to the particle track
+            track->AddPoint(*geom->GetCurrentPoint(), *(geom->GetCurrentPoint()+1), *(geom->GetCurrentPoint()+2), t);
+        }else
+        {
+
+            double step = generator->Generate_Photon_Step();
+            geom->FindNextBoundary();
+            //cout<<"Step: "<<step<<" Boundary: "<<geom->GetStep()<<endl;
+            if(step<geom->GetStep()) //If the generated step is smaller than the distance to the boundary, the photon is absorved
+            {
+                geom->Step(step);
+                //Compute velocity
+                double v = 1/1.58;
+
+                //Compute time
+                t += double(step/v);
+                track->AddPoint(*geom->GetCurrentPoint(), *(geom->GetCurrentPoint()+1), *(geom->GetCurrentPoint()+2), t);
+                cout<<"Photon Absorbed"<<endl;
+                return;
+            }else
+            {
+                //Make step to the next boundary and cross it
+                geom->FindNextBoundaryAndStep();
+
+                //Get the step taken
+                //double snext  = geom->GetStep();
+
+                //std::cout << "Photon Step to cross boundary in vacuum: " << snext << std::endl;
+
+                //Compute velocity
+                double v = 1/1.58;
+
+                //Compute time
+                t += double(geom->GetStep())/v;
+            }
+
+        }
 
     }
 }
