@@ -24,7 +24,6 @@ public:
 
 	//Check material where the particle is propagating
 	TGeoMaterial* CheckMaterial();
-	double GetRefractiveIndex();
 
 	//Calculate energy lost by the particle in small step, when interacting with the material
 	double BetheBloch(double v, double step);
@@ -33,7 +32,7 @@ public:
 	double FresnelLaw(double thetai, double n1, double n2);
 
 	//Check if light is reflected or transmitted
-	bool Check_Reflection(std::vector<double>& di);
+	bool Is_Reflected(double thetai);
 
 
 	void Draw();

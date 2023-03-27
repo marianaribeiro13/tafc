@@ -5,7 +5,7 @@
 ////////////////////////// Constructor ////////////////////////////////////////
 
 Tracking::Tracking(double radius, double height, double distance, double airgap, double althickness, double step, Generator* g) : Geometry(), stepvalue(step){
-
+    
     generator = g;
 
     Build_MuonTelescope(radius, height, distance, airgap, althickness);
@@ -226,6 +226,9 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
         //Get current material
         TGeoMaterial *cmat = CheckMaterial();
 
+        //Vector for new direction 
+        std::vector<double> ndir(3);
+
         //Check if the particle is in vacuum or not and propagate accordingly
         if(cmat->GetDensity() == 0){
 
@@ -237,23 +240,29 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
             //Get the step taken
             double step_vac  = geom->GetStep();
 
-            if(Is_Reflected(d)){
+            double* normal = geom->FindNormal(kTRUE);
+
+            vector<double> n {*normal, *(normal+1), *(normal+2)};
+
+            double thetai = tools::Angle_Between_Vectors(d, n);
+
+            if(Is_Reflected(thetai)){
                 //Dont cross boundary
                 geom->Step(kTRUE, kFALSE);
                 
-                //new direction
+                //Get reflected direction
+                ndir = tools::Get_Reflected_Dir(d, n);
 
-<<<<<<< HEAD
             } else {
                 //Cross boundary
                 geom->Step(kTRUE, kTRUE);
-=======
-            //Compute velocity
-            double v = 2.998e10;
->>>>>>> 707918b761c7771d0e7973bd018bd8626123a71b
 
-                //newdirection
+                //Get refracted direction
+                ndir = tools::Get_Refracted_Dir(d, n, thetai, 1, 1.58);
             }
+
+            //Set new direction
+            geom->SetCurrentDirection(ndir.data());
 
             //Compute time
             t += double(step_vac); //v=c=1
@@ -267,6 +276,8 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
             double absorption_step = generator->Generate_Photon_Step();
 
             double total_dist = 0.;
+
+            double v = 1/1.58;
 
             while(total_dist < absorption_step){
                 //if photon step 
@@ -291,11 +302,23 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
                     return;
 
                 } else {
-                    if(Is_Reflected(d)){
+
+                    double* normal = geom->FindNormal(kTRUE);
+
+                    vector<double> n {*normal, *(normal+1), *(normal+2)};
+
+                    double thetai = tools::Angle_Between_Vectors(d, n);
+
+                    if(Is_Reflected(thetai)){
                         //Dont cross boundary
                         geom->Step(kTRUE, kFALSE);
+
+                        //Get reflected direction
+                        ndir = tools::Get_Reflected_Dir(d, n);
+
+                        //Set new direction
+                        geom->SetCurrentDirection(ndir.data());
                         
-                        //new direction
                         total_dist += geom->GetStep();
 
                         //Compute time
@@ -307,12 +330,12 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
                     } else {
                         //Cross boundary
                         geom->Step(kTRUE, kTRUE);
-                        
-                        //Get refraction angle
-                        double thetat = SnellLaw(thetai, 1, 1.58);
 
-                        //newdirection
+                        //Get refracted direction
+                        ndir = tools::Get_Refracted_Dir(d, n, thetai, 1, 1.58);  
                         
+                        //Set new direction
+                        geom->SetCurrentDirection(ndir.data());
 
                         //Compute time
                         t += double(snext)/v;
@@ -328,38 +351,22 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
     }
 }
 
- //double thetat = SnellLaw(thetai, 1, 1.58);
-
-        //new direction;
-
-        /*//Make step to the next boundary and cross it
-        geom->FindNextBoundaryAndStep();
-
-        //Get the step taken
-        double snext  = geom->GetStep();
-
-        //std::cout << "Photon Step to cross boundary in vacuum: " << snext << std::endl;
-
-        
-   // }
-//}
 
 
 //////////////////////////////////// Check current material /////////////////////////////
 
-TGeoMaterial* Tracking::CheckMaterial()
-{
-    return geom->GetCurrentNode()->GetVolume()->GetMedium()->GetMaterial();
-}
+TGeoMaterial* Tracking::CheckMaterial(){
 
-double Tracking::GetRefractiveIndex()
-{
+    //Get current node
+    TGeoNode *cnode = geom->GetCurrentNode();
 
-    if(CheckMaterial()->GetDensity() == 1.023){return 1.58;};
-    if(CheckMaterial()->GetDensity() == 0){return 1;};
-    if(CheckMaterial()->GetDensity() == 2.7){return 1.37;};
-    std::cout<<"ERROR Invalid Material"<<endl;
-    exit(0);
+    //Get current volume
+    TGeoVolume *cvol = cnode->GetVolume();
+
+    //Get current material
+    TGeoMaterial *cmat = cvol->GetMedium()->GetMaterial();
+
+    return cmat;
 }
 
 
@@ -412,13 +419,7 @@ double Tracking::FresnelLaw(double thetai, double n1, double n2){
 }
 
 //Check if light is reflected or transmitted and get new light direction
-bool Tracking::Check_Reflection(std::vector<double>& di){
-
-    double* normal = geom->FindNormal(Bool_t forward=kTRUE);
-
-    vector<double> n {*normal, *(normal+1), *(normal+2)};
-
-    double thetai = tools::Angle_Between_Vectors(di, n);
+bool Tracking::Is_Reflected(double thetai){
 
     double Reff = FresnelLaw(thetai, 1, 1.58);
 
@@ -431,7 +432,6 @@ bool Tracking::Check_Reflection(std::vector<double>& di){
         return false;
     }
 }
-
 
 ////////////////////////////////////////////////// Draw geometry and tracks function //////////////////////////////////////
 
