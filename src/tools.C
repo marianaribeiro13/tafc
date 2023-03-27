@@ -37,15 +37,15 @@ vector<double> tools::Get_Reflected_Dir(vector<double>& i, vector<double>& n){
 }
 
 //Get refracted direction vector, from incident and normal directions
-vector<double> tools::Get_Refracted_Dir(vector<double>& i, vector<double>& n, double thetai, double n1, double n2){
+vector<double> tools::Get_Refracted_Dir(vector<double>& inc, vector<double>& n, double thetai, double n1, double n2){
   
   const double r = n1 / n2;
-  const double sinT2 = r * r * (1.0 - thetai * thetai);
+  const double sinT2 = r * r * (1.0 - cos(thetai) * cos(thetai));
   if(sinT2 > 1.0) exit(0); // TIR
   const double cosT = sqrt(1.0 - sinT2);
   vector<double> aux(3);
-  for (i=1; i<3; i++){
-    aux[i]=r*i[i]+(-r*thetai -cosT)*n[i];
+  for (int i=1; i<3; i++){
+    aux[i]=r*inc[i]+(-r*thetai -cosT)*n[i];
   }
   return aux;
 }
