@@ -17,10 +17,12 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
     //--- define some materials
     TGeoMaterial *matVacuum = new TGeoMaterial("Vacuum", 0, 0, 0);
     TGeoMaterial *matAl = new TGeoMaterial("Al", 26.98, 13, 2.7);
+    TGeoMaterial *matPlastic = new TGeoMaterial("Plastic", 0, 0, 1.023);
 
     //--- define some media
     TGeoMedium *Vacuum = new TGeoMedium("Vacuum",1, matVacuum);
     TGeoMedium *Al = new TGeoMedium("Root Material",2, matAl);
+    TGeoMedium *Plastic = new TGeoMedium("Root Material2",3, matPlastic);
  
     //Create world volume
     TGeoVolume* top = geom->MakeTube("TOP", Vacuum, 0, 200., 100.); // rmin, rmax, mid height
@@ -30,7 +32,7 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
     TGeoTranslation *tr1 = new TGeoTranslation(0., 0., (double)(distance + height)/2.);
     TGeoTranslation *tr2 = new TGeoTranslation(0., 0., - (double)(distance + height)/2.);
 
-    TGeoVolume *scintillator = geom->MakeTube("scintillator", Al, 0, radius, height/2.); // rmin, rmax, mid height
+    TGeoVolume *scintillator = geom->MakeTube("scintillator", Plastic, 0, radius, height/2.); // rmin, rmax, mid height
     scintillator->SetLineColor(kOrange+10);
     top->AddNode(scintillator, 1, tr1);
     top->AddNode(scintillator, 2, tr2);
