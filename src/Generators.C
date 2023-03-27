@@ -139,12 +139,4 @@ Particle* Generator::Generate_Photon(){
 double Generator::Generate_Photon_Step(){
 
   return 380*log(1/(1-Random->Uniform(1)));
-<<<<<<< HEAD
-  
-=======
-<<<<<<< HEAD
-=======
-
->>>>>>> aa64db4db222f8f12d3af54fec3b22efb0a5ff98
->>>>>>> 707918b761c7771d0e7973bd018bd8626123a71b
 }
