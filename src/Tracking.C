@@ -5,7 +5,7 @@
 ////////////////////////// Constructor ////////////////////////////////////////
 
 Tracking::Tracking(double radius, double height, double distance, double airgap, double althickness, double step, Generator* g) : Geometry(), stepvalue(step){
-    
+
     generator = g;
 
     Build_MuonTelescope(radius, height, distance, airgap, althickness);
@@ -227,7 +227,7 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
             //std::cout << "Photon Step to cross boundary in vacuum: " << snext << std::endl;
 
             //Compute velocity
-            double v = 1/1.58;
+            double v = 2.998e10;
 
             //Compute time
             t += double(geom->GetStep())/v;
