@@ -136,8 +136,8 @@ Particle* Generator::Generate_Photon(){
   return new Particle(22 ,Generate_Photon_Energy(), Generate_Vector());
 }
 
-  double Generator::Generate_Photon_Step()
-{
+double Generator::Generate_Photon_Step(){
+
   return 380*log(1/(1-Random->Uniform(1)));
-}
+  
 }

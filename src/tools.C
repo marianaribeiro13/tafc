@@ -3,15 +3,43 @@
 tools::~tools(){}
 
 
-double tools::Norm(vector<double> v)
-{
+double tools::Norm(vector<double> v){
   double n = 0;
-  for(int i=0;i<v.size();i++)
-  {
+  for(int i=0; i < v.size(); i++){
     n+=v[i]*v[i];
   }
+
   return sqrt(n);
 }
+
+double tools::Angle_Between_Vectors(vector<double>& v1, vector<double>& v2){
+  
+  double dot = v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2];   
+  double lenSq1 = v1[0]*v1[0] + v1[1]*v1[1] + v1[2]*v1[2];
+  double lenSq2 = v2[0]*v2[0] + v2[1]*v2[1] + v2[2]*v2[2];
+  
+  return acos(dot/sqrt(lenSq1 * lenSq2));
+}
+
+double tools::SnellLaw(double thetai, double n1, double n2){
+
+  return asin(n1*sin(thetai)/n2);
+}
+
+//Get reflected direction vector, from incident and normal vectors
+vector<double> tools::Get_Reflected_Dir(vector<double>& i, vector<double>& n){
+
+  return i+2*n*(std::inner_product(i.begin(), i.end(), n.begin(), 0));
+}
+
+//Get refracted direction vector, from incident and normal directions
+vector<double> tools::Get_Refracted_Dir(vector<double>& i, vector<double>& n, double thetai){
+
+
+}
+
+
+
 
 vector<string> tools::Read_File(string name){
   fstream fp;

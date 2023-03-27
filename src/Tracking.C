@@ -97,7 +97,7 @@ void Tracking::Propagate(int track_index){
             int nsteps = 1;
 
             while(geom->IsSameLocation(*cpoint + stepvalue*d[0], *(cpoint+1) + stepvalue*d[1], *(cpoint+2) + stepvalue*d[2])){
-
+                
                 //Set arbitrary step
                 geom->SetStep(stepvalue);
 
@@ -128,33 +128,35 @@ void Tracking::Propagate(int track_index){
                 double p = part->CalculateMomentum(E-dE);
                 part->ChangeMomentum(p);
 
+                //////////////////////////// Photons generation /////////////////////////////////
+
                 //Get number of photons from Poisson distribution (approximatly 1 photon per 100 eV)
                 int nphotons = generator->Generate_Photon_Number(dE*10000);
 
                 //Save current position in vector
                 vector<double> pos {*cpoint, *(cpoint+1), *(cpoint+2)};
+                
+                //if(nsteps == 100){
 
-                if(nsteps == 100){
+                std::cout << "Number of photons in step " << nsteps << ": " << nphotons << std::endl;
 
-                    std::cout << "Number of photons in step " << nsteps << ": " << nphotons << std::endl;
+                for(int i = 0; i < nphotons; i++){
 
-                    for(int i = 0; i < nphotons; i++){
+                    //int photon_index = AddParticle(i+1, pos, generator->Generate_Photon());
 
-                        //int photon_index = AddParticle(i+1, pos, generator->Generate_Photon());
+                    //generate photon according to Scintillator spectrum
+                    Particle* photon = generator->Generate_Photon();
 
-                        //generate photon according to Scintillator spectrum
-                        Particle* photon = generator->Generate_Photon();
+                    //Create secondary Track associated to photon
+                    TVirtualGeoTrack* DaughterTrack = track->AddDaughter(i, photon->GetPDG(), photon); //track id, particle pdg, pointer to particle
 
-                        //Create secondary Track associated to photon
-                        TVirtualGeoTrack* DaughterTrack = track->AddDaughter(i, photon->GetPDG(), photon); //track id, particle pdg, pointer to particle
-
-                        //Assign initial position to the track
-                        DaughterTrack->AddPoint(pos[0], pos[1], pos[2], t);
-
-                        PropagatePhoton(DaughterTrack, t);
-                    }
-
+                    //Assign initial position to the track
+                    DaughterTrack->AddPoint(pos[0], pos[1], pos[2], t);
+                
+                    PropagatePhoton(DaughterTrack, t);
                 }
+
+                //}
 
                 geom->SetCurrentTrack(track_index);
 
@@ -207,71 +209,135 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
     //Set the given track as the current track
     geom->SetCurrentTrack(track);
 
+    //Get particle associated to track
+    Particle* part = new Particle(dynamic_cast<Particle*>(track->GetParticle()));
+
+    //Get particle direction
+    std::vector<double> d = part->GetDirection();
+
     //Setting both initial point and direction and finding the state
-    geom->InitTrack(track->GetFirstPoint(), dynamic_cast<Particle*>(track->GetParticle())->GetDirection().data());
+    geom->InitTrack(track->GetFirstPoint(), d.data());
 
     //Get new position of the particle after making the step
-    //const double *cpoint = geom->GetCurrentPoint();
+    const double *cpoint = geom->GetCurrentPoint();
 
-    while(!(geom->IsOutside()))
-    {
-        if(CheckMaterial()->GetDensity()==0) //Vacuum
-        {
+    while(!(geom->IsOutside())){
 
-            //Make step to the next boundary and cross it
-            geom->FindNextBoundaryAndStep();
+        //Get current material
+        TGeoMaterial *cmat = CheckMaterial();
+
+        //Check if the particle is in vacuum or not and propagate accordingly
+        if(cmat->GetDensity() == 0){
+
+            std::cout << "Outside scintilator" << endl;
+
+            //Make step to the next boundary
+            geom->FindNextBoundary();
 
             //Get the step taken
-            //double snext  = geom->GetStep();
+            double step_vac  = geom->GetStep();
 
-            //std::cout << "Photon Step to cross boundary in vacuum: " << snext << std::endl;
+            if(Is_Reflected(d)){
+                //Dont cross boundary
+                geom->Step(kTRUE, kFALSE);
+                
+                //new direction
 
-            //Compute velocity
-            double v = 1/1.58;
+            } else {
+                //Cross boundary
+                geom->Step(kTRUE, kTRUE);
 
-            //Compute time
-            t += double(geom->GetStep())/v;
-
-            //Add new point to the particle track
-            track->AddPoint(*geom->GetCurrentPoint(), *(geom->GetCurrentPoint()+1), *(geom->GetCurrentPoint()+2), t);
-        }else
-        {
-
-            double step = generator->Generate_Photon_Step();
-            geom->FindNextBoundary();
-            //cout<<"Step: "<<step<<" Boundary: "<<geom->GetStep()<<endl;
-            if(step<geom->GetStep()) //If the generated step is smaller than the distance to the boundary, the photon is absorved
-            {
-                geom->Step(step);
-                //Compute velocity
-                double v = 1/1.58;
-
-                //Compute time
-                t += double(step/v);
-                track->AddPoint(*geom->GetCurrentPoint(), *(geom->GetCurrentPoint()+1), *(geom->GetCurrentPoint()+2), t);
-                cout<<"Photon Absorbed"<<endl;
-                return;
-            }else
-            {
-                //Make step to the next boundary and cross it
-                geom->FindNextBoundaryAndStep();
-
-                //Get the step taken
-                //double snext  = geom->GetStep();
-
-                //std::cout << "Photon Step to cross boundary in vacuum: " << snext << std::endl;
-
-                //Compute velocity
-                double v = 1/1.58;
-
-                //Compute time
-                t += double(geom->GetStep())/v;
+                //newdirection
             }
 
-        }
+            //Compute time
+            t += double(step_vac); //v=c=1
 
+            //Add new point to the particle track
+            track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
+
+        } else { 
+
+            //Generate random step according to the probability of absorption of the photon
+            double absorption_step = generator->Generate_Photon_Step();
+
+            double total_dist = 0.;
+
+            while(total_dist < absorption_step){
+                //if photon step 
+                geom->FindNextBoundary();
+
+                double snext = geom->GetStep();
+
+                if(absorption_step < snext){
+
+                    //Set arbitrary step
+                    geom->SetStep(absorption_step);
+
+                    //Execute step (flag = kFALSE means it is an arbitrary step, not limited by geometrical reasons)
+                    geom->Step(kFALSE);
+
+                    //Compute time
+                    t += double(snext)/v;
+
+                    //Add new point to the particle track
+                    track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
+
+                    return;
+
+                } else {
+                    if(Is_Reflected(d)){
+                        //Dont cross boundary
+                        geom->Step(kTRUE, kFALSE);
+                        
+                        //new direction
+                        total_dist += geom->GetStep();
+
+                        //Compute time
+                        t += double(snext)/v;
+
+                        //Add new point to the particle track
+                        track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
+
+                    } else {
+                        //Cross boundary
+                        geom->Step(kTRUE, kTRUE);
+                        
+                        //Get refraction angle
+                        double thetat = SnellLaw(thetai, 1, 1.58);
+
+                        //newdirection
+                        
+
+                        //Compute time
+                        t += double(snext)/v;
+
+                        //Add new point to the particle track
+                        track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
+
+                        break;
+                    }
+                }
+            }
+        }
     }
 }
+
+ //double thetat = SnellLaw(thetai, 1, 1.58);
+
+        //new direction;
+
+        /*//Make step to the next boundary and cross it
+        geom->FindNextBoundaryAndStep();
+
+        //Get the step taken
+        double snext  = geom->GetStep();
+
+        //std::cout << "Photon Step to cross boundary in vacuum: " << snext << std::endl;
+
+        
+   // }
+//}
 
 
 //////////////////////////////////// Check current material /////////////////////////////
@@ -326,15 +392,50 @@ double Tracking::BetheBloch(double v, double step){
 }
 
 
+double Tracking::FresnelLaw(double thetai, double n1, double n2){
+    
+    // Reflection probability for s-polarized light
+    double Rs = abs((n1*cos(thetai)-n2*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2)))/
+                    (n1*cos(thetai)+n2*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2))));
+    
+    // Reflection probability for p-polarized light
+    double Rp = abs((n1*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2))-n2*cos(thetai)))/
+                    (n1*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2))+n2*cos(thetai));
+
+    return 0.5*(Rs+Rp);
+}
+
+//Check if light is reflected or transmitted and get new light direction
+bool Tracking::Check_Reflection(std::vector<double>& di){
+
+    double* normal = geom->FindNormal(Bool_t forward=kTRUE);
+
+    vector<double> n {*normal, *(normal+1), *(normal+2)};
+
+    double thetai = tools::Angle_Between_Vectors(di, n);
+
+    double Reff = FresnelLaw(thetai, 1, 1.58);
+
+    if(generator->Uniform(0,1) < Reff) {
+
+        return true;
+
+    } else {
+
+        return false;
+    }
+}
+
+
 ////////////////////////////////////////////////// Draw geometry and tracks function //////////////////////////////////////
 
 void Tracking::Draw(){
 
     TCanvas *c1 = new TCanvas("c1","c1");
-    c1->cd();
+    //c1->cd();
     //top->Draw("ogle");
     geom->GetTopVolume()->Draw();
     geom->DrawTracks("/*");
     //geom->AnimateTracks(0, 1000, 200, "/* /G /S");
-    c1->SaveAs("Drawing.pdf");
+    c1->SaveAs("Simulation.pdf");
 }

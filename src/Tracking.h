@@ -28,6 +28,13 @@ public:
 	//Calculate energy lost by the particle in small step, when interacting with the material
 	double BetheBloch(double v, double step);
 
+	//Photon reflection
+	double FresnelLaw(double thetai, double n1, double n2);
+
+	//Check if light is reflected or transmitted
+	bool Check_Reflection(std::vector<double>& di);
+
+
 	void Draw();
 
 protected:
