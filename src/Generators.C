@@ -140,4 +140,3 @@ Particle* Generator::Generate_Photon(){
 {
   return 380*log(1/(1-Random->Uniform(1)));
 }
-}
