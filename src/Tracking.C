@@ -97,7 +97,7 @@ void Tracking::Propagate(int track_index){
             int nsteps = 1;
 
             while(geom->IsSameLocation(*cpoint + stepvalue*d[0], *(cpoint+1) + stepvalue*d[1], *(cpoint+2) + stepvalue*d[2])){
-                
+
                 //Set arbitrary step
                 geom->SetStep(stepvalue);
 
@@ -135,7 +135,7 @@ void Tracking::Propagate(int track_index){
 
                 //Save current position in vector
                 vector<double> pos {*cpoint, *(cpoint+1), *(cpoint+2)};
-                
+
                 //if(nsteps == 100){
 
                 std::cout << "Number of photons in step " << nsteps << ": " << nphotons << std::endl;
@@ -152,7 +152,7 @@ void Tracking::Propagate(int track_index){
 
                     //Assign initial position to the track
                     DaughterTrack->AddPoint(pos[0], pos[1], pos[2], t);
-                
+
                     PropagatePhoton(DaughterTrack, t);
                 }
 
@@ -240,17 +240,15 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
             if(Is_Reflected(d)){
                 //Dont cross boundary
                 geom->Step(kTRUE, kFALSE);
-                
+
                 //new direction
 
-<<<<<<< HEAD
+
             } else {
                 //Cross boundary
-                geom->Step(kTRUE, kTRUE);
-=======
-            //Compute velocity
+                geom->Step(kTRUE, kTRUE)
+                            //Compute velocity
             double v = 2.998e10;
->>>>>>> 707918b761c7771d0e7973bd018bd8626123a71b
 
                 //newdirection
             }
@@ -261,7 +259,7 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
             //Add new point to the particle track
             track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
 
-        } else { 
+        } else {
 
             //Generate random step according to the probability of absorption of the photon
             double absorption_step = generator->Generate_Photon_Step();
@@ -269,7 +267,7 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
             double total_dist = 0.;
 
             while(total_dist < absorption_step){
-                //if photon step 
+                //if photon step
                 geom->FindNextBoundary();
 
                 double snext = geom->GetStep();
@@ -294,7 +292,7 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
                     if(Is_Reflected(d)){
                         //Dont cross boundary
                         geom->Step(kTRUE, kFALSE);
-                        
+
                         //new direction
                         total_dist += geom->GetStep();
 
@@ -307,12 +305,12 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
                     } else {
                         //Cross boundary
                         geom->Step(kTRUE, kTRUE);
-                        
+
                         //Get refraction angle
                         double thetat = SnellLaw(thetai, 1, 1.58);
 
                         //newdirection
-                        
+
 
                         //Compute time
                         t += double(snext)/v;
@@ -340,7 +338,7 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
 
         //std::cout << "Photon Step to cross boundary in vacuum: " << snext << std::endl;
 
-        
+
    // }
 //}
 
@@ -399,11 +397,11 @@ double Tracking::BetheBloch(double v, double step){
 
 
 double Tracking::FresnelLaw(double thetai, double n1, double n2){
-    
+
     // Reflection probability for s-polarized light
     double Rs = abs((n1*cos(thetai)-n2*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2)))/
                     (n1*cos(thetai)+n2*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2))));
-    
+
     // Reflection probability for p-polarized light
     double Rp = abs((n1*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2))-n2*cos(thetai)))/
                     (n1*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2))+n2*cos(thetai));
@@ -412,7 +410,7 @@ double Tracking::FresnelLaw(double thetai, double n1, double n2){
 }
 
 //Check if light is reflected or transmitted and get new light direction
-bool Tracking::Check_Reflection(std::vector<double>& di){
+bool Tracking::Is_Reflected(std::vector<double>& di){
 
     double* normal = geom->FindNormal(Bool_t forward=kTRUE);
 
@@ -430,7 +428,7 @@ bool Tracking::Check_Reflection(std::vector<double>& di){
 
         return false;
     }
-}
+  }
 
 
 ////////////////////////////////////////////////// Draw geometry and tracks function //////////////////////////////////////
