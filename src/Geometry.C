@@ -25,7 +25,7 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
     TGeoMedium *Plastic = new TGeoMedium("Root Material2",3, matPlastic);
  
     //Create world volume
-    TGeoVolume* top = geom->MakeTube("TOP", Vacuum, 0, 200., 100.); // rmin, rmax, mid height
+    TGeoVolume* top = geom->MakeTube("TOP", Vacuum, 0, 15., 1.5*distance); // rmin, rmax, mid height
     geom->SetTopVolume(top);
 
     //Define two transformations to position the scintillators
