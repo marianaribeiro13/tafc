@@ -97,7 +97,7 @@ void Tracking::Propagate(int track_index){
             int nsteps = 1;
 
             while(geom->IsSameLocation(*cpoint + stepvalue*d[0], *(cpoint+1) + stepvalue*d[1], *(cpoint+2) + stepvalue*d[2])){
-                
+
                 //Set arbitrary step
                 geom->SetStep(stepvalue);
 
@@ -135,7 +135,7 @@ void Tracking::Propagate(int track_index){
 
                 //Save current position in vector
                 vector<double> pos {*cpoint, *(cpoint+1), *(cpoint+2)};
-                
+
                 //if(nsteps == 100){
 
                 std::cout << "Number of photons in step " << nsteps << ": " << nphotons << std::endl;
@@ -152,7 +152,7 @@ void Tracking::Propagate(int track_index){
 
                     //Assign initial position to the track
                     DaughterTrack->AddPoint(pos[0], pos[1], pos[2], t);
-                
+
                     PropagatePhoton(DaughterTrack, t);
                 }
 
@@ -249,6 +249,7 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
             if(Is_Reflected(thetai)){
                 //Dont cross boundary
                 geom->Step(kTRUE, kFALSE);
+<<<<<<< HEAD
                 
                 //Get reflected direction
                 ndir = tools::Get_Reflected_Dir(d, n);
@@ -256,6 +257,17 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
             } else {
                 //Cross boundary
                 geom->Step(kTRUE, kTRUE);
+=======
+
+                //new direction
+
+
+            } else {
+                //Cross boundary
+                geom->Step(kTRUE, kTRUE)
+                            //Compute velocity
+            double v = 2.998e10;
+>>>>>>> 834fcbc704040ef467cff3b09f6fbb5ba5c48c58
 
                 //Get refracted direction
                 ndir = tools::Get_Refracted_Dir(d, n, thetai, 1, 1.58);
@@ -270,7 +282,7 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
             //Add new point to the particle track
             track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
 
-        } else { 
+        } else {
 
             //Generate random step according to the probability of absorption of the photon
             double absorption_step = generator->Generate_Photon_Step();
@@ -280,7 +292,7 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
             double v = 1/1.58;
 
             while(total_dist < absorption_step){
-                //if photon step 
+                //if photon step
                 geom->FindNextBoundary();
 
                 double snext = geom->GetStep();
@@ -313,12 +325,16 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
                         //Dont cross boundary
                         geom->Step(kTRUE, kFALSE);
 
+<<<<<<< HEAD
                         //Get reflected direction
                         ndir = tools::Get_Reflected_Dir(d, n);
 
                         //Set new direction
                         geom->SetCurrentDirection(ndir.data());
                         
+=======
+                        //new direction
+>>>>>>> 834fcbc704040ef467cff3b09f6fbb5ba5c48c58
                         total_dist += geom->GetStep();
 
                         //Compute time
@@ -330,12 +346,21 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
                     } else {
                         //Cross boundary
                         geom->Step(kTRUE, kTRUE);
+<<<<<<< HEAD
 
                         //Get refracted direction
                         ndir = tools::Get_Refracted_Dir(d, n, thetai, 1, 1.58);  
                         
                         //Set new direction
                         geom->SetCurrentDirection(ndir.data());
+=======
+
+                        //Get refraction angle
+                        double thetat = SnellLaw(thetai, 1, 1.58);
+
+                        //newdirection
+
+>>>>>>> 834fcbc704040ef467cff3b09f6fbb5ba5c48c58
 
                         //Compute time
                         t += double(snext)/v;
@@ -351,6 +376,24 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
     }
 }
 
+<<<<<<< HEAD
+=======
+ //double thetat = SnellLaw(thetai, 1, 1.58);
+
+        //new direction;
+
+        /*//Make step to the next boundary and cross it
+        geom->FindNextBoundaryAndStep();
+
+        //Get the step taken
+        double snext  = geom->GetStep();
+
+        //std::cout << "Photon Step to cross boundary in vacuum: " << snext << std::endl;
+
+
+   // }
+//}
+>>>>>>> 834fcbc704040ef467cff3b09f6fbb5ba5c48c58
 
 
 //////////////////////////////////// Check current material /////////////////////////////
@@ -406,11 +449,11 @@ double Tracking::BetheBloch(double v, double step){
 
 
 double Tracking::FresnelLaw(double thetai, double n1, double n2){
-    
+
     // Reflection probability for s-polarized light
     double Rs = abs((n1*cos(thetai)-n2*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2)))/
                     (n1*cos(thetai)+n2*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2))));
-    
+
     // Reflection probability for p-polarized light
     double Rp = abs((n1*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2))-n2*cos(thetai)))/
                     (n1*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2))+n2*cos(thetai));
@@ -419,7 +462,17 @@ double Tracking::FresnelLaw(double thetai, double n1, double n2){
 }
 
 //Check if light is reflected or transmitted and get new light direction
+<<<<<<< HEAD
 bool Tracking::Is_Reflected(double thetai){
+=======
+bool Tracking::Is_Reflected(std::vector<double>& di){
+
+    double* normal = geom->FindNormal(Bool_t forward=kTRUE);
+
+    vector<double> n {*normal, *(normal+1), *(normal+2)};
+
+    double thetai = tools::Angle_Between_Vectors(di, n);
+>>>>>>> 834fcbc704040ef467cff3b09f6fbb5ba5c48c58
 
     double Reff = FresnelLaw(thetai, 1, 1.58);
 
@@ -431,7 +484,7 @@ bool Tracking::Is_Reflected(double thetai){
 
         return false;
     }
-}
+  }
 
 ////////////////////////////////////////////////// Draw geometry and tracks function //////////////////////////////////////
 
