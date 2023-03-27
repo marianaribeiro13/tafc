@@ -5,7 +5,7 @@
 ////////////////////////// Constructor ////////////////////////////////////////
 
 Tracking::Tracking(double radius, double height, double distance, double airgap, double althickness, double step, Generator* g) : Geometry(), stepvalue(step){
-    
+
     generator = g;
 
     Build_MuonTelescope(radius, height, distance, airgap, althickness);
@@ -243,9 +243,14 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
                 
                 //new direction
 
+<<<<<<< HEAD
             } else {
                 //Cross boundary
                 geom->Step(kTRUE, kTRUE);
+=======
+            //Compute velocity
+            double v = 2.998e10;
+>>>>>>> 707918b761c7771d0e7973bd018bd8626123a71b
 
                 //newdirection
             }
@@ -342,18 +347,19 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
 
 //////////////////////////////////// Check current material /////////////////////////////
 
-TGeoMaterial* Tracking::CheckMaterial(){
+TGeoMaterial* Tracking::CheckMaterial()
+{
+    return geom->GetCurrentNode()->GetVolume()->GetMedium()->GetMaterial();
+}
 
-    //Get current node
-    TGeoNode *cnode = geom->GetCurrentNode();
+double Tracking::GetRefractiveIndex()
+{
 
-    //Get current volume
-    TGeoVolume *cvol = cnode->GetVolume();
-
-    //Get current material
-    TGeoMaterial *cmat = cvol->GetMedium()->GetMaterial();
-
-    return cmat;
+    if(CheckMaterial()->GetDensity() == 1.023){return 1.58;};
+    if(CheckMaterial()->GetDensity() == 0){return 1;};
+    if(CheckMaterial()->GetDensity() == 2.7){return 1.37;};
+    std::cout<<"ERROR Invalid Material"<<endl;
+    exit(0);
 }
 
 

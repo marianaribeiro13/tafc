@@ -24,6 +24,7 @@ public:
 
 	//Check material where the particle is propagating
 	TGeoMaterial* CheckMaterial();
+	double GetRefractiveIndex();
 
 	//Calculate energy lost by the particle in small step, when interacting with the material
 	double BetheBloch(double v, double step);
