@@ -31,13 +31,29 @@ double tools::SnellLaw(double thetai, double n1, double n2){
 vector<double> tools::Get_Reflected_Dir(vector<double>& i, vector<double>& n){
 
   std::vector<double> r(3);
-  double x = 2*std::inner_product(i.begin(), i.end(), n.begin(), 0);
-  for(int j=0;j<3;j++){r[j]=i[j]-x*n[j];};
+  //double x = ;
+  double x = 2*std::inner_product(i.begin(), i.end(), n.begin(), 0.);
+  for(int j=0;j<3;j++){r[j] = (i[j]- x*n[j]);};
+  //for(int j=0;j<3;j++){r[j]= -i[j];};
   return r;
 }
 
 //Get refracted direction vector, from incident and normal directions
 vector<double> tools::Get_Refracted_Dir(vector<double>& inc, vector<double>& n, double thetai, double n1, double n2){
+  
+  double r = n1 / n2;
+  double c = sqrt(1-r*r*sin(thetai)*sin(thetai));
+
+  vector<double> aux(3);
+  for (int i=0; i<3; i++){
+    aux[i] = r*(inc[i]+cos(thetai)*n[i]) - c*n[i];
+  }
+
+  return aux;
+}
+
+//Get refracted direction vector, from incident and normal directions
+/*vector<double> tools::Get_Refracted_Dir(vector<double>& inc, vector<double>& n, double thetai, double n1, double n2){
   
   const double r = n1 / n2;
   const double sinT2 = r * r * (1.0 - cos(thetai) * cos(thetai));
@@ -48,9 +64,7 @@ vector<double> tools::Get_Refracted_Dir(vector<double>& inc, vector<double>& n, 
     aux[i]=r*inc[i]+(-r*thetai -cosT)*n[i];
   }
   return aux;
-}
-
-
+}*/
 
 
 vector<string> tools::Read_File(string name){

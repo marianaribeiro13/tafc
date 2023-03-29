@@ -14,18 +14,17 @@ Tracking::Tracking(double radius, double height, double distance, double airgap,
 
 ///////////////////////// Add Particle function //////////////////////////////
 
-//Adds track associated to particle (give initial position)
+//Adds track associated to particle (give initial position) 
+//id is a track identifier that can be useful
 int Tracking::AddParticle(int const id, vector<double> x, Particle* particle){
 
-    std::cout << "Aquiii" << std::endl;
-
-    //Create Track associated to particle
+    //Create Track associated to particle object
     int track_index = geom->AddTrack(id, particle->GetPDG(), particle); //track id, particle pdg, pointer to particle
 
     //Get created track
     TVirtualGeoTrack* track = geom->GetTrack(track_index);
 
-    //Assign initial position to the track
+    //Assign initial position and time to the track
     track->AddPoint(x[0], x[1], x[2], 0);
 
     return track_index;
@@ -34,6 +33,8 @@ int Tracking::AddParticle(int const id, vector<double> x, Particle* particle){
 
 /////////////////////////// Propagate Massive particle function //////////////////////////////
 
+//This propagation function considers particles which (on average) do not change direction when interacting with the medium
+//The energy loss of the particle through the material is calculated through the Bethe-Bloch equation 
 void Tracking::Propagate(int track_index){
 
     //Set the given track as the current track
@@ -45,7 +46,7 @@ void Tracking::Propagate(int track_index){
     //Get particle associated to track
     Particle* part = new Particle(dynamic_cast<Particle*>(track->GetParticle()));
 
-    //Get particle direction
+    //Get particle current direction
     std::vector<double> d = part->GetDirection();
 
     //Setting both initial point and direction and finding the state
@@ -54,151 +55,127 @@ void Tracking::Propagate(int track_index){
     //Propagation time
     double t = 0;
 
+    //Velocity variable
+    double v = 0;
+
+    //Get pointer to current position (Whenever we update the position cpoint is updated, 
+    //since it is equal to the geom pointer to the current position)
+    const double *cpoint = geom->GetCurrentPoint();
+
+    //We only exit the loop once we leave the top volume 
     while(!(geom->IsOutside())){
 
         //Get current material
         TGeoMaterial *cmat = CheckMaterial();
 
-        //Check if the particle is in vacuum or not and propagate accordingly
-        if(cmat->GetDensity() == 0){
+        /////////////// Check if the particle is in vacuum or not and propagate accordingly
 
-            std::cout << "Outside scintilator" << endl;
+        if(cmat->GetDensity() == 0){ //Particle is in vacuum (or air, approximatly)
+
+            //std::cout << "Outside scintilator" << endl;
 
             //Make step to the next boundary and cross it
-            geom->FindNextBoundaryAndStep();
+            geom->FindNextBoundaryAndStep(); //This updates the current position, so cpoint pointer points to the new position
 
             //std::cout << part->GetEnergy() << std::endl;
 
-            //Get the step taken
-            double step_vac  = geom->GetStep();
+            //std::cout << "Step to cross boundary in vacuum: " << step_vac << std::endl;
 
-            std::cout << "Step to cross boundary in vacuum: " << step_vac << std::endl;
-
-            //Compute velocity
-            double v = (double)(part->GetMomentum())/(part->GetEnergy());
+            //Compute velocity (natural units - c=1)
+            v = (double)(part->GetMomentum())/(part->GetEnergy());
 
             //Compute time
-            t += double(step_vac)/v;
-
-            //Get new position of the particle after making the step
-            const double *cpoint = geom->GetCurrentPoint();
+            //t += geom->GetStep()/v; //GetStep returns the step taken with FindNextBoundaryAndStep()
 
             //Add new point to the particle track
-            track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
+            //track->AddPoint(cpoint[0], cpoint[1], cpoint[2], t);
 
-        } else {
+        } else { //Particle is in some material with specified density
 
-            std::cout << "Inside scintilator" << endl;
-
-            //Get current particle position in the geometry
-            const double *cpoint = geom->GetCurrentPoint(); //cpoint always points to the current position
+            //std::cout << "Inside scintilator" << endl;
 
             //Number of arbitrary steps inside material
             int nsteps = 1;
 
-            while(geom->IsSameLocation(*cpoint + stepvalue*d[0], *(cpoint+1) + stepvalue*d[1], *(cpoint+2) + stepvalue*d[2])){
+            //The while condition checks whether the next position (if we make the defined step value in the current particle direction)
+            //is in the same node/volume of the current position (we leave the loop when the defined step is greater than the distance to the next boundary) 
+            while(geom->IsSameLocation(cpoint[0] + stepvalue*d[0], cpoint[1] + stepvalue*d[1], cpoint[2] + stepvalue*d[2])){
                 
-                //Set arbitrary step
+                //Set arbitrary step - defined in the simulation (by the constructer)
                 geom->SetStep(stepvalue);
 
-                //Execute step (flag = kFALSE means it is an arbitrary step, not limited by geometrical reasons)
-                geom->Step(kFALSE);
+                //Execute step defined by SetStep (flag = kFALSE means it is an arbitrary step, not limited by geometrical reasons)
+                geom->Step(kFALSE); //This updates the current position, so cpoint pointer points to the new position
 
-                //Get energy before step
-                double E = part->GetEnergy();
+                //Get velocity before step and update energy and momentum after energy loss
+                std::vector<double> aux = Update_EnergyMomentum(stepvalue, part);
 
-                //Compute particle velocity
-                double v = (double)(part->GetMomentum())/E;
+                //aux[0] = velocity   aux[1] = energy loss
 
-                //Compute propagation time
-                t += double(stepvalue)/v;
+                //Add step propagation time to current time
+                t += double(stepvalue)/aux[0];
 
-                //Add new point to the particle track
-                track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2),t);
-
-                //Calculate energy lost to the material
-                double dE = BetheBloch(v, stepvalue);
-
-                //Update particle energy
-                part->ChangeEnergy(E-dE);
-
-                //std::cout << part->GetEnergy() << std::endl;
-
-                //Update particle momentum
-                double p = part->CalculateMomentum(E-dE);
-                part->ChangeMomentum(p);
 
                 //////////////////////////// Photons generation /////////////////////////////////
 
-                //Get number of photons from Poisson distribution (approximatly 1 photon per 100 eV)
-                int nphotons = generator->Generate_Photon_Number(dE*10000);
+                //Depending on the energy lost by the particle during the step 
+                //there will be a certain number of emited photons by the material (depends on material properties)
 
-                //Save current position in vector
-                vector<double> pos {*cpoint, *(cpoint+1), *(cpoint+2)};
+                //Get number of photons from Poisson distribution (usually approximatly 1 photon per 100 eV for common scintillators)
+                int nphotons = generator->Generate_Photon_Number(aux[1]*10000); //Energy is converted to MeV
+
+                //Save current position in vector (the current geometry position will now be used for the photons)
+                //so we need to save the current position of the massive particle to reset the track once we stop propagating the photons
+                vector<double> pos {cpoint[0], cpoint[1], cpoint[2]};
                 
-                //if(nsteps == 100){
+                if(nsteps == 100){
 
-                std::cout << "Number of photons in step " << nsteps << ": " << nphotons << std::endl;
+                    std::cout << "Number of photons in step " << nsteps << ": " << nphotons << std::endl;
 
-                for(int i = 0; i < nphotons; i++){
+                    //Propagate all emited photons
+                    //for(int i = 0; i < nphotons; i++){
 
-                    //int photon_index = AddParticle(i+1, pos, generator->Generate_Photon());
+                        //generate photon according to Scintillator spectrum
+                        Particle* photon = generator->Generate_Photon();
 
-                    //generate photon according to Scintillator spectrum
-                    Particle* photon = generator->Generate_Photon();
+                        //Create secondary Track associated to photon
+                        TVirtualGeoTrack* DaughterTrack = track->AddDaughter(1, photon->GetPDG(), photon); //track id, particle pdg, pointer to particle
 
-                    //Create secondary Track associated to photon
-                    TVirtualGeoTrack* DaughterTrack = track->AddDaughter(i, photon->GetPDG(), photon); //track id, particle pdg, pointer to particle
-
-                    //Assign initial position to the track
-                    DaughterTrack->AddPoint(pos[0], pos[1], pos[2], t);
+                        //Assign initial position to the track (the current position of the massive particle)
+                        DaughterTrack->AddPoint(pos[0], pos[1], pos[2], t);
                 
-                    PropagatePhoton(DaughterTrack, t);
+                        //Propagate photon
+                        PropagatePhoton(DaughterTrack, t);
+                    //}
                 }
 
-                //}
-
+                //Set the current track as the track of the massive particle to continue propagating
                 geom->SetCurrentTrack(track_index);
 
+                //Setting current point and direction back to the ones of the massive particle and finding the state
                 geom->InitTrack(pos.data(), d.data());
 
-                ++nsteps;
-            }
+                ++nsteps; //Increse number of steps taken
+
+            } //End of while loop (the particle is now closer to the next boundary than the defined step)
 
             //Make step to the next boundary and cross it
-            geom->FindNextBoundaryAndStep(stepvalue);
+            geom->FindNextBoundaryAndStep(stepvalue); //This updates the current position, so cpoint pointer points to the new position
 
-            //Get the step taken
-            double step_mat  = geom->GetStep();
+            //Get velocity before step and update energy and momentum after energy loss
+            std::vector<double> aux2 = Update_EnergyMomentum(geom->GetStep(), part);
 
-            //Get energy before step
-            double E = part->GetEnergy();
+            v = aux2[0];
 
-            //Compute velocity
-            double v = (double)(part->GetMomentum())/E;
+        } // End of propagation inside current material
 
-            //Compute time
-            t += double(step_mat)/v;
+        //Compute time
+        t += geom->GetStep()/v;
 
-            //Add new point to the particle track
-            track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
+        //Add new point to the particle track
+        track->AddPoint(cpoint[0], cpoint[1], cpoint[2], t);
 
-            //Calculate energy lost to the material
-            double dE = BetheBloch(v, step_mat);
-
-            std::cout << "Step to cross boundary inside scintillator: " << step_mat << std::endl;
-
-            //Update particle energy
-            part->ChangeEnergy(E-dE);
-
-            //std::cout << part->GetEnergy() << std::endl;
-
-            //Update particle momentum
-            double p = part->CalculateMomentum(E-dE);
-            part->ChangeMomentum(p);
-
-        }
-    }
+    } //End of propagation of the massive particle
 }
 
 
@@ -209,10 +186,10 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
     //Set the given track as the current track
     geom->SetCurrentTrack(track);
 
-    //Get particle associated to track
+    //Get photon associated to track
     Particle* part = new Particle(dynamic_cast<Particle*>(track->GetParticle()));
 
-    //Get particle direction
+    //Get photon direction
     std::vector<double> d = part->GetDirection();
 
     //Setting both initial point and direction and finding the state
@@ -221,136 +198,152 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
     //Get new position of the particle after making the step
     const double *cpoint = geom->GetCurrentPoint();
 
+    //Current particle direction
+    const double *cdir = geom->GetCurrentDirection();
+
+    //Auxiliary time to propagate the photon
+    double t_aux = t;
+
+    //Velocity variable
+    double v = 0;
+
+    //Generate random step according to the probability of absorption of the photon 
+    //(the distance the photon goes through in the material before being absorbed)
+    double absorption_step = generator->Generate_Photon_Step();
+
+    std::cout << "Absorption_step: " << absorption_step << std::endl;
+
+    //Distance traveled by the photon in the material
+    double total_dist = 0.;
+
+    //We only exit the loop once the photon leaves the top volume
+    //or when the distance travelled by the photon in the material is equal to the absorption distance generated (the photon is absorbed) 
     while(!(geom->IsOutside())){
 
         //Get current material
         TGeoMaterial *cmat = CheckMaterial();
 
-        //Vector for new direction 
+        //Vector for new direction (updated after reflection or refraction of light)
         std::vector<double> ndir(3);
 
-        //Check if the particle is in vacuum or not and propagate accordingly
-        if(cmat->GetDensity() == 0){
+        //Get current direction
+        const double *cdir = geom->GetCurrentDirection();
+        vector<double> dir {cdir[0], cdir[1], cdir[2]};
 
-            std::cout << "Outside scintilator" << endl;
+        /////////////// Check if the particle is in vacuum or not and propagate accordingly
 
-            //Make step to the next boundary
+        if(cmat->GetDensity() == 0){ //Photon is in vacuum (or air, approximatly)
+
+            v = 1; //Velocity = c in vacuum
+            std::cout << "Outside scintilator" << std::endl;
+
+            //Find distance to the next boundary and set step
             geom->FindNextBoundary();
 
-            //Get the step taken
-            double step_vac  = geom->GetStep();
-
+            //Get normal vector to the next boundary
             double* normal = geom->FindNormal(kTRUE);
+            vector<double> n {normal[0], normal[1], normal[2]};
 
-            vector<double> n {*normal, *(normal+1), *(normal+2)};
-
-            double thetai = tools::Angle_Between_Vectors(d, n);
-
-            if(Is_Reflected(thetai)){
-                //Dont cross boundary
+            //Calculate angle between normal vector and incident vector
+            double thetai = tools::Angle_Between_Vectors(dir, n);
+            
+            //////////////// Check if the photon is going to be reflected or transmited and propagate accordingly
+            
+            if(Is_Reflected(thetai)){ //Photon is reflected
+                
+                //Take step to next boundary but dont cross boundary (second flag is kFALSE)
                 geom->Step(kTRUE, kFALSE);
                 
                 //Get reflected direction
-                ndir = tools::Get_Reflected_Dir(d, n);
+                ndir = tools::Get_Reflected_Dir(dir, n);
 
-            } else {
-                //Cross boundary
+            } else { //Photon is transmited (refraction according to Snells Law)
+                
+                //Take step to next boundary and cross boundary (second flag is kTRUE)
                 geom->Step(kTRUE, kTRUE);
 
                 //Get refracted direction
-                ndir = tools::Get_Refracted_Dir(d, n, thetai, 1, 1.58);
+                ndir = tools::Get_Refracted_Dir(dir, n, thetai, 1, 1.58);
             }
 
             //Set new direction
             geom->SetCurrentDirection(ndir.data());
 
-            //Compute time
-            t += double(step_vac); //v=c=1
+        } else { //Photon is in some material with specified density
 
-            //Add new point to the particle track
-            track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
+            std::cout << "Inside scintilator" << std::endl;
 
-        } else { 
+            v = 1/1.58; //Velocity = c/n in some material, where n is the refractive index
+                
+            //Find distance to the next boundary and set step 
+            geom->FindNextBoundary();
 
-            //Generate random step according to the probability of absorption of the photon
-            double absorption_step = generator->Generate_Photon_Step();
+            //Get the step taken
+            double snext = geom->GetStep();
 
-            double total_dist = 0.;
+            std::cout << "Step: " << snext << std::endl;
 
-            double v = 1/1.58;
+            //If the absorption distance generated (minus the already travelled distance in this material) is shorter than the distance to the next boundary, 
+            //the photon is propagated until the point of absorption
+            if((absorption_step - total_dist) < snext){ 
 
-            while(total_dist < absorption_step){
-                //if photon step 
-                geom->FindNextBoundary();
+                std::cout << "Absorbed" << std::endl;
 
-                double snext = geom->GetStep();
+                //Set arbitrary step
+                geom->SetStep(absorption_step-total_dist);
 
-                if(absorption_step < snext){
+                //Execute step (flag = kFALSE means it is an arbitrary step, not limited by geometrical reasons)
+                geom->Step(kFALSE);
 
-                    //Set arbitrary step
-                    geom->SetStep(absorption_step);
+                return; //exit the PropagatePhoton function (the photon is absorbed - no more propagation needed)
+            
+            } else {  //if photon reaches the next boundary without being absorbed
 
-                    //Execute step (flag = kFALSE means it is an arbitrary step, not limited by geometrical reasons)
-                    geom->Step(kFALSE);
+                //Get normal vector to the next boundary
+                double* normal = geom->FindNormal(kTRUE);
+                vector<double> n {normal[0], normal[1], normal[2]};
 
-                    //Compute time
-                    t += double(snext)/v;
+                //Calculate angle between normal vector and incident vector
+                double thetai = tools::Angle_Between_Vectors(dir, n);
 
-                    //Add new point to the particle track
-                    track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
+                if(Is_Reflected(thetai)){ //Photon is reflected
 
-                    return;
+                    std::cout << "Reflected " << std::endl;
+                
+                    //Take step to next boundary but dont cross boundary (second flag is kFALSE)
+                    geom->Step(kTRUE, kFALSE);
 
-                } else {
+                    //Get reflected direction
+                    ndir = tools::Get_Reflected_Dir(dir, n);
 
-                    double* normal = geom->FindNormal(kTRUE);
+                } else { //Photon is transmited (refraction according to Snells Law)
 
-                    vector<double> n {*normal, *(normal+1), *(normal+2)};
+                    std::cout << "Transmited " << std::endl;
+                
+                    //Take step to next boundary and cross boundary (second flag is kTRUE)
+                    geom->Step(kTRUE, kTRUE);
 
-                    double thetai = tools::Angle_Between_Vectors(d, n);
-
-                    if(Is_Reflected(thetai)){
-                        //Dont cross boundary
-                        geom->Step(kTRUE, kFALSE);
-
-                        //Get reflected direction
-                        ndir = tools::Get_Reflected_Dir(d, n);
-
-                        //Set new direction
-                        geom->SetCurrentDirection(ndir.data());
-                        
-                        total_dist += geom->GetStep();
-
-                        //Compute time
-                        t += double(snext)/v;
-
-                        //Add new point to the particle track
-                        track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
-
-                    } else {
-                        //Cross boundary
-                        geom->Step(kTRUE, kTRUE);
-
-                        //Get refracted direction
-                        ndir = tools::Get_Refracted_Dir(d, n, thetai, 1, 1.58);  
-                        
-                        //Set new direction
-                        geom->SetCurrentDirection(ndir.data());
-
-                        //Compute time
-                        t += double(snext)/v;
-
-                        //Add new point to the particle track
-                        track->AddPoint(*cpoint, *(cpoint+1), *(cpoint+2), t);
-
-                        break;
-                    }
+                    //Get refracted direction
+                    ndir = tools::Get_Refracted_Dir(dir, n, thetai, 1, 1.58);  
+                
                 }
-            }
+
+                //Set new direction
+                geom->SetCurrentDirection(ndir.data());
+
+                //Increase distance travelled by the photon in current material
+                total_dist += geom->GetStep();
+            } 
+
         }
+
+        //Compute time
+        t_aux += geom->GetStep()/v;
+
+        //Add new point to the particle track
+        track->AddPoint(cpoint[0], cpoint[1], cpoint[2], t_aux);
     }
 }
-
 
 
 //////////////////////////////////// Check current material /////////////////////////////
@@ -367,6 +360,32 @@ TGeoMaterial* Tracking::CheckMaterial(){
     TGeoMaterial *cmat = cvol->GetMedium()->GetMaterial();
 
     return cmat;
+}
+
+
+////////////////////////////////// Update energy and momentum and return velocity before update //////////////////////////
+
+std::vector<double> Tracking::Update_EnergyMomentum(double step, Particle* part){
+
+    std::vector<double> aux(2); // aux[0] = velocity   aux[1] = energy loss
+
+    //Get energy before step
+    double E = part->GetEnergy();
+
+    //Compute velocity before step (natural units - c=1)
+    aux[0] = (double)(part->GetMomentum())/E;
+
+    //Calculate energy lost to the material
+    aux[1] = BetheBloch(aux[0], step);
+    
+    //Update particle energy
+    part->ChangeEnergy(E-aux[1]);
+
+    //Update particle momentum
+    double p = part->CalculateMomentum(E-aux[1]);
+    part->ChangeMomentum(p);
+
+    return aux;
 }
 
 
@@ -404,7 +423,7 @@ double Tracking::BetheBloch(double v, double step){
     return dE_SI;
 }
 
-
+//Calculate probability of reflection at boundary
 double Tracking::FresnelLaw(double thetai, double n1, double n2){
     
     // Reflection probability for s-polarized light
@@ -438,7 +457,6 @@ bool Tracking::Is_Reflected(double thetai){
 void Tracking::Draw(){
 
     TCanvas *c1 = new TCanvas("c1","c1");
-    //c1->cd();
     //top->Draw("ogle");
     geom->GetTopVolume()->Draw();
     geom->DrawTracks("/*");

@@ -25,7 +25,6 @@ public:
 private:
   TRandom *Random;
   TF1 *Momentum_Distribution;
-  TF1 *Absorbtion_Probability;
   TSpline3 *Photon_Spectrum;
 };
 
