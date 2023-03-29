@@ -18,7 +18,7 @@ Generator::Generator(){
 Generator::~Generator(){};
 
 vector<double> Generator::Generate_Vector(){
-  
+
   vector<double> v(3);
   v[0] = Random->Uniform(-1,1);
   v[1] = Random->Uniform(-1,1);
@@ -44,12 +44,12 @@ vector<double> Generator::Generate_Direction_From_Theta(double theta) {
   //generate x and y direction normalized
   d[0] = aux0*(double)sqrt((1-d[2]*d[2])/(aux0*aux0+aux1*aux1)); // x direction
   d[1] = aux1*(double)sqrt((1-d[2]*d[2])/(aux0*aux0+aux1*aux1)); // y direction
-  
+
   return d;
 }
 
 double Generator::Random_Distribution(double xmin,double xmax,TF1 *F){
-  
+
   double x = Random->Uniform(xmin,xmax);
   double y = F->GetMaximum(xmin,xmax)*Random->Uniform(1);
 
@@ -64,7 +64,7 @@ double Generator::Random_Distribution(double xmin,double xmax,TF1 *F){
 }
 
 vector<double> Generator::Generate_Position(double d){
-    
+
   double h=1,R=5.;
   vector<double> aux(3);
   aux[2] = d/2+h;
@@ -93,12 +93,12 @@ vector<double> Generator::Random_Distribution_2D(TF1* F,double xmin,double xmax,
 }
 
 double Generator::Generate_Photon_Energy(){
-  
+
   double x = Random->Uniform(380,500);
   double y = Random->Uniform(1);
 
 while(y>Photon_Spectrum->Eval(x)){
-    
+
     x = Random->Uniform(380,500);
     y = Random->Uniform(1);
 
@@ -108,7 +108,7 @@ while(y>Photon_Spectrum->Eval(x)){
 }
 
 int Generator::Generate_Photon_Number(double expected){
-  
+
   return Random->Poisson(expected);
 }
 
@@ -120,7 +120,7 @@ Particle* Generator::Generate_CosmicMuon(){
   //Create muon (pdg = 13)
   Particle* muon = new Particle(13, aux[0]*1000, Generate_Direction_From_Theta(aux[1]));
 
-  return muon;  
+  return muon;
 }
 
 Particle* Generator::Generate_Photon(){
@@ -130,15 +130,12 @@ Particle* Generator::Generate_Photon(){
 
 /*double Generator::Generate_Photon_Step(){
 
-  return 380*log(1/(1-Random->Uniform(1))); 
+  return 380*log(1/(1-Random->Uniform(1)));
 }*/
 
 double Generator::Generate_Photon_Step(){
-
-<<<<<<< HEAD
-  return -380*log(Uniform(0,1)); 
-}
-=======
+/*
+  return -380*log(Uniform(0,1));
+}*/
   return 380*log(1/(1-Random->Uniform(1)));
 }
->>>>>>> d92670f2bb6843c42741a7c43fa8f70b224cca20
