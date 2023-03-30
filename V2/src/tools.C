@@ -43,7 +43,8 @@ vector<double> tools::Get_Reflected_Dir(vector<double> i, vector<double> n){
 }
 
 //Get refracted direction vector, from incident and normal directions
-vector<double> tools::Get_Refracted_Dir(vector<double> i, vector<double> n, double thetai, double n1, double n2){
+vector<double> tools::Get_Refracted_Dir(vector<double> i, vector<double> n, double thetai, double n1, double n2)
+{
 
   double r = n1 / n2;
   double c = std::inner_product(i.begin(), i.end(), n.begin(), 0.);

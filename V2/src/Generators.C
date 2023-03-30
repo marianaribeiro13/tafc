@@ -15,6 +15,22 @@ Generator::Generator(){
   Photon_Spectrum = tools::Interpolate_Photon_Spectrum("Photon_Spectrum.txt");
 }
 
+Generator::Generator(int seed)
+{
+  Random = new TRandom(seed);
+
+   //2D Spectrum of the muon (x[0] is the momentum and x[1] is the incident angle)
+  auto f = [](double *x,double *par){
+       return pow(cos(x[1]),3)*0.00253*pow(x[0]*cos(x[1]),-(0.2455+1.288*log10(x[0]*cos(x[1]))-0.255*pow(log10(x[0]*cos(x[1])),2)+0.0209*pow(log10(x[0]*cos(x[1])),3) ));
+  };
+
+  //Create TF1 function with the 2D spectrum of the muon
+  Momentum_Distribution = new TF1("f",f);
+
+  Photon_Spectrum = tools::Interpolate_Photon_Spectrum("Photon_Spectrum.txt");
+}
+
+
 Generator::~Generator(){};
 
 vector<double> Generator::Generate_Vector(){

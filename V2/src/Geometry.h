@@ -17,6 +17,7 @@ public:
 	double GetDistance(){return Distance;};
 	double GetHeight(){return Height;};
 	double GetRadius(){return Radius;};
+	TGeoManager* GetGeoManager(){return geom;};
 
 	// Build Telescope methods
 	void Build_MuonTelescope(double radius, double height, double distance,  double airgap, double althickness); // radius and height of scintillator and distance between scintillators

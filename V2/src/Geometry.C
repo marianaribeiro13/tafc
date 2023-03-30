@@ -20,7 +20,7 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
     Distance = distance;
     innerradius = radius + airgap;
     outerradius = radius +airgap+althickness;
-    MaxHeight = (distance/2+height)*1.2;
+    MaxHeight = (distance/2+height)*1.5;
     MaxRadius = 3*radius;
     Airgap = airgap;
     Thickness = althickness;
@@ -54,7 +54,7 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
     TGeoTranslation *tr4 = new TGeoTranslation(0., 0., height/2. + airgap + althickness/2.);
     TGeoTranslation *tr5 = new TGeoTranslation(0., 0., -(height/2. + airgap + althickness/2.));
 
-    TGeoVolume *sidetube = geom->MakeTube("lateral foil", Al, radius+airgap, radius+airgap+althickness, height/2. + 2*airgap);
+    TGeoVolume *sidetube = geom->MakeTube("lateral foil", Al, radius+airgap, radius+airgap+althickness, height/2. +althickness +airgap);
     TGeoVolume *covertube = geom->MakeTube("cover foil", Al, 0, radius+airgap+althickness, althickness/2.);
 
     TGeoVolume *foil = new TGeoVolumeAssembly("Aluminium foil");

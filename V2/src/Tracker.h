@@ -6,7 +6,7 @@
 #include "Generators.h"
 #include "tools.h"
 #include <vector>
-#include "TVirtualGeoTrack.h"
+#include "TGeoTrack.h"
 #include "TGeoNavigator.h"
 #include "TF1.h"
 #include "TCanvas.h"
@@ -20,10 +20,7 @@ public:
   ~Tracker();
   double CheckDensity();
   double Update_Energy(double);
-  double CheckRefractiveIndex();
-  double CheckNextRefractiveIndex();
   bool CheckSameLocation();
-  bool CheckOutside();
   double FresnelLaw(double,double,double);
   bool CheckReflection(double,double,double);
   vector<double> GetNormal();
@@ -31,7 +28,7 @@ public:
   bool VacuumToPlastic(double);
   bool VacuumToAluminium(double);
 
-
+  /////Propagators/////
   void Propagate_Muon();
   void Muon_Vacuum_Step();
   void Muon_Scintillator_Step();
@@ -42,12 +39,17 @@ public:
   void InitializePhotonTrack(int);
   void Photon_Vacuum_Step(int);
   void Photon_Scintillator_Step(int);
+  void Photon_Scintillator_Absorbtion(int,double);
   void Photon_Aluminium_Step(int);
 
+  //Draw Mode
   void Draw();
+  void Propagate_Photons_DrawMode(int);
 
-
+  //Debug Mode//
   void print_vector(const double*);
+  void Debug();
+
 private:
   double stepvalue;
   Generator* generator;
@@ -62,6 +64,7 @@ private:
   int N_detected;
   int N_lost;
   bool DoubleCross;
+
 
 };
 

@@ -8,6 +8,7 @@ using namespace std;
 class Generator{
 public:
   Generator();
+  Generator(int);
   vector<double> Generate_Vector(); //creates a random, normalized 3d vector
   vector<double> Generate_Direction_From_Theta(double theta); //creates a random, normalized 3d vector, given the angle with the z axis
   double Random_Distribution(double ,double ,TF1* ); //generates a random number according to a distribution

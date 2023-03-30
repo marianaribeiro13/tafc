@@ -5,7 +5,7 @@
 ////////////////////////// Constructor ////////////////////////////////////////
 
 Tracking::Tracking(double radius, double height, double distance, double airgap, double althickness, double step, Generator* g) : Geometry(), stepvalue(step){
-    
+
     generator = g;
 
     Build_MuonTelescope(radius, height, distance, airgap, althickness);
@@ -14,7 +14,7 @@ Tracking::Tracking(double radius, double height, double distance, double airgap,
 
 ///////////////////////// Add Particle function //////////////////////////////
 
-//Adds track associated to particle (give initial position) 
+//Adds track associated to particle (give initial position)
 //id is a track identifier that can be useful
 int Tracking::AddParticle(int const id, vector<double> x, Particle* particle){
 
@@ -34,7 +34,7 @@ int Tracking::AddParticle(int const id, vector<double> x, Particle* particle){
 /////////////////////////// Propagate Massive particle function //////////////////////////////
 
 //This propagation function considers particles which (on average) do not change direction when interacting with the medium
-//The energy loss of the particle through the material is calculated through the Bethe-Bloch equation 
+//The energy loss of the particle through the material is calculated through the Bethe-Bloch equation
 void Tracking::Propagate(int track_index){
 
     //Set the given track as the current track
@@ -58,11 +58,11 @@ void Tracking::Propagate(int track_index){
     //Velocity variable
     double v = 0;
 
-    //Get pointer to current position (Whenever we update the position cpoint is updated, 
+    //Get pointer to current position (Whenever we update the position cpoint is updated,
     //since it is equal to the geom pointer to the current position)
     const double *cpoint = geom->GetCurrentPoint();
 
-    //We only exit the loop once we leave the top volume 
+    //We only exit the loop once we leave the top volume
     while(!(geom->IsOutside())){
 
         //Get current material
@@ -98,9 +98,9 @@ void Tracking::Propagate(int track_index){
             int nsteps = 1;
 
             //The while condition checks whether the next position (if we make the defined step value in the current particle direction)
-            //is in the same node/volume of the current position (we leave the loop when the defined step is greater than the distance to the next boundary) 
+            //is in the same node/volume of the current position (we leave the loop when the defined step is greater than the distance to the next boundary)
             while(geom->IsSameLocation(cpoint[0] + stepvalue*d[0], cpoint[1] + stepvalue*d[1], cpoint[2] + stepvalue*d[2])){
-                
+
                 //Set arbitrary step - defined in the simulation (by the constructer)
                 geom->SetStep(stepvalue);
 
@@ -118,7 +118,7 @@ void Tracking::Propagate(int track_index){
 
                 //////////////////////////// Photons generation /////////////////////////////////
 
-                //Depending on the energy lost by the particle during the step 
+                //Depending on the energy lost by the particle during the step
                 //there will be a certain number of emited photons by the material (depends on material properties)
 
                 //Get number of photons from Poisson distribution (usually approximatly 1 photon per 100 eV for common scintillators)
@@ -127,7 +127,7 @@ void Tracking::Propagate(int track_index){
                 //Save current position in vector (the current geometry position will now be used for the photons)
                 //so we need to save the current position of the massive particle to reset the track once we stop propagating the photons
                 vector<double> pos {cpoint[0], cpoint[1], cpoint[2]};
-                
+
                 if(nsteps == 100){
 
                     std::cout << "Number of photons in step " << nsteps << ": " << nphotons << std::endl;
@@ -143,7 +143,7 @@ void Tracking::Propagate(int track_index){
 
                         //Assign initial position to the track (the current position of the massive particle)
                         DaughterTrack->AddPoint(pos[0], pos[1], pos[2], t);
-                
+
                         //Propagate photon
                         PropagatePhoton(DaughterTrack, t);
                     //}
@@ -207,7 +207,7 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
     //Velocity variable
     double v = 0;
 
-    //Generate random step according to the probability of absorption of the photon 
+    //Generate random step according to the probability of absorption of the photon
     //(the distance the photon goes through in the material before being absorbed)
     double absorption_step = generator->Generate_Photon_Step();
 
@@ -217,7 +217,7 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
     double total_dist = 0.;
 
     //We only exit the loop once the photon leaves the top volume
-    //or when the distance travelled by the photon in the material is equal to the absorption distance generated (the photon is absorbed) 
+    //or when the distance travelled by the photon in the material is equal to the absorption distance generated (the photon is absorbed)
     while(!(geom->IsOutside())){
 
         //Get current material
@@ -232,7 +232,8 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
 
         /////////////// Check if the particle is in vacuum or not and propagate accordingly
 
-        if(cmat->GetDensity() == 0){ //Photon is in vacuum (or air, approximatly)
+        if(cmat->GetDensity() == 0)
+        { //Photon is in vacuum (or air, approximatly)
 
             v = 1; //Velocity = c in vacuum
             std::cout << "Outside scintilator" << std::endl;
@@ -242,23 +243,25 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
 
             //Get normal vector to the next boundary
             double* normal = geom->FindNormal(kTRUE);
-            vector<double> n {normal[0], normal[1], normal[2]};
+            vector<double> n(normal,normal+3);
 
             //Calculate angle between normal vector and incident vector
             double thetai = tools::Angle_Between_Vectors(dir, n);
-            
+
             //////////////// Check if the photon is going to be reflected or transmited and propagate accordingly
-            
-            if(Is_Reflected(thetai)){ //Photon is reflected
-                
+
+            if(Is_Reflected(thetai))
+            { //Photon is reflected
+
                 //Take step to next boundary but dont cross boundary (second flag is kFALSE)
                 geom->Step(kTRUE, kFALSE);
-                
+
                 //Get reflected direction
                 ndir = tools::Get_Reflected_Dir(dir, n);
 
-            } else { //Photon is transmited (refraction according to Snells Law)
-                
+            } else
+            { //Photon is transmited (refraction according to Snells Law)
+
                 //Take step to next boundary and cross boundary (second flag is kTRUE)
                 geom->Step(kTRUE, kTRUE);
 
@@ -269,13 +272,15 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
             //Set new direction
             geom->SetCurrentDirection(ndir.data());
 
-        } else { //Photon is in some material with specified density
+
+        }else
+        { //Photon is in some material with specified density
 
             std::cout << "Inside scintilator" << std::endl;
 
             v = 1/1.58; //Velocity = c/n in some material, where n is the refractive index
-                
-            //Find distance to the next boundary and set step 
+
+            //Find distance to the next boundary and set step
             geom->FindNextBoundary();
 
             //Get the step taken
@@ -283,9 +288,9 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
 
             std::cout << "Step: " << snext << std::endl;
 
-            //If the absorption distance generated (minus the already travelled distance in this material) is shorter than the distance to the next boundary, 
+            //If the absorption distance generated (minus the already travelled distance in this material) is shorter than the distance to the next boundary,
             //the photon is propagated until the point of absorption
-            if((absorption_step - total_dist) < snext){ 
+            if((absorption_step - total_dist) < snext){
 
                 std::cout << "Absorbed" << std::endl;
 
@@ -296,7 +301,7 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
                 geom->Step(kFALSE);
 
                 return; //exit the PropagatePhoton function (the photon is absorbed - no more propagation needed)
-            
+
             } else {  //if photon reaches the next boundary without being absorbed
 
                 //Get normal vector to the next boundary
@@ -309,7 +314,7 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
                 if(Is_Reflected(thetai)){ //Photon is reflected
 
                     std::cout << "Reflected " << std::endl;
-                
+
                     //Take step to next boundary but dont cross boundary (second flag is kFALSE)
                     geom->Step(kTRUE, kFALSE);
 
@@ -319,13 +324,13 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
                 } else { //Photon is transmited (refraction according to Snells Law)
 
                     std::cout << "Transmited " << std::endl;
-                
+
                     //Take step to next boundary and cross boundary (second flag is kTRUE)
                     geom->Step(kTRUE, kTRUE);
 
                     //Get refracted direction
-                    ndir = tools::Get_Refracted_Dir(dir, n, thetai, 1, 1.58);  
-                
+                    ndir = tools::Get_Refracted_Dir(dir, n, thetai, 1, 1.58);
+
                 }
 
                 //Set new direction
@@ -333,7 +338,7 @@ void Tracking::PropagatePhoton(TVirtualGeoTrack* track, double t){
 
                 //Increase distance travelled by the photon in current material
                 total_dist += geom->GetStep();
-            } 
+            }
 
         }
 
@@ -377,7 +382,7 @@ std::vector<double> Tracking::Update_EnergyMomentum(double step, Particle* part)
 
     //Calculate energy lost to the material
     aux[1] = BetheBloch(aux[0], step);
-    
+
     //Update particle energy
     part->ChangeEnergy(E-aux[1]);
 
@@ -391,45 +396,15 @@ std::vector<double> Tracking::Update_EnergyMomentum(double step, Particle* part)
 
 ////////////////////////////////////// Bethe Bloch function to calculate energy loss in material //////////////////////////////////
 
-double Tracking::BetheBloch(double v, double step){
 
-    //NATURAL
-    //Double_t alpha=0.0072974;
-    //Double_t I1=64.70713358e-6; //MeV
-    //Double_t n=2.5587248e18; //MeV
-    Int_t Z=-1;
-    //Double_t mass_muon=105.6583755; //MeV
-    //Double_t mass_electron=0.51099895; //MeV
-    //Double_t dE=0;
-    //Double_t dx=1.e-4;
-
-    //S.I.
-    Double_t c = 299792458;
-    Double_t mp = 1.672621637e-27;
-    Double_t me = 9.1093821499999992e-31;
-    Double_t qe = 1.602176487e-19;
-    Double_t na = 6.02214179e23;
-    Double_t eps0 = 8.854187817e-12;
-    Double_t n_density=3.33e29; // per m^3
-    Double_t I = 1.03660828e-17;
-
-    //double dEdx = (4*TMath::Pi()*n*Z*Z*alpha*alpha*(log((2*mass_electron*v*v)/(I*(1.-v*v)))-v*v))/(mass_electron*v*v);
-
-    double dEdx_SI = (qe*qe*qe*qe*n_density*Z*Z*(log((2*me*c*c*v*v)/(I*(1-v*v)))-v*v))/(4*M_PI*eps0*eps0*me*c*c*v*v);
-    dEdx_SI = dEdx_SI/(1.602e-13);
-
-    double dE_SI = dEdx_SI * step/100;
-
-    return dE_SI;
-}
 
 //Calculate probability of reflection at boundary
 double Tracking::FresnelLaw(double thetai, double n1, double n2){
-    
+
     // Reflection probability for s-polarized light
     double Rs = abs((n1*cos(thetai)-n2*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2)))/
                     (n1*cos(thetai)+n2*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2))));
-    
+
     // Reflection probability for p-polarized light
     double Rp = abs((n1*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2))-n2*cos(thetai)))/
                     (n1*sqrt(1-(n1*sin(thetai)/n2)*(n1*sin(thetai)/n2))+n2*cos(thetai));
@@ -440,7 +415,7 @@ double Tracking::FresnelLaw(double thetai, double n1, double n2){
 //Check if light is reflected or transmitted and get new light direction
 bool Tracking::Is_Reflected(double thetai){
 
-    double Reff = FresnelLaw(thetai, 1, 1.58);
+    double Reff = FresnelLaw(thetai, 1.58, 1);
 
     if(generator->Uniform(0,1) < Reff) {
 
