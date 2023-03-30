@@ -42,6 +42,12 @@ public:
   void Photon_Scintillator_Absorbtion(int,double);
   void Photon_Aluminium_Step(int);
 
+  //Data
+  int GetN_photons(){return N_photons;};
+  int GetN_absorbed(){return N_absorbed;};
+  int GetN_detected(){return N_detected;};
+  int GetN_lost(){return N_lost;};
+
   //Draw Mode
   void Draw();
   void Propagate_Photons_DrawMode(int);

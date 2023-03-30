@@ -318,11 +318,6 @@ void Tracker::Propagate_Photons()
     if(geom->IsOutside()){N_lost++;};
   }
 
-  cout<<endl<<"Total Photons Generated: "<<N_photons<<endl;
-  cout<<"Photons Absorbed: "<<N_absorbed<<endl;
-  cout<<"Photons Detected: "<<N_detected<<endl;
-  cout<<"Photons Lost: "<<N_lost<<endl;
-
   return;
 }
 
