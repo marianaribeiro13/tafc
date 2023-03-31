@@ -1,6 +1,5 @@
 #include "Geometry.h"
-
-
+using namespace std;
 ///////////////////////////////// Constructor ///////////////////////////////
 
 Geometry::Geometry(){
@@ -12,18 +11,22 @@ Geometry::Geometry(){
 
 ///////////////////////////// Build Muon Telescope //////////////////////////
 
-void Geometry::Build_MuonTelescope(double radius, double height, double distance, double airgap, double althickness) {
-
-
+void Geometry::Build_MuonTelescope(double radius, double height, double distance, double airgap, double althickness,int n_SIPMS)
+{
     Radius = radius;
     Height = height;
     Distance = distance;
     innerradius = radius + airgap;
     outerradius = radius +airgap+althickness;
-    MaxHeight = (distance/2+height)*1.5;
-    MaxRadius = 3*radius;
     Airgap = airgap;
     Thickness = althickness;
+    MaxHeight = (distance/2+height+airgap+althickness)*1.2;
+    MaxRadius = 2*outerradius;
+    n_SIPM = n_SIPMS;
+    SIPM_size = .6;
+    SIPM_angle = 2*M_PI / n_SIPM;
+    SIPM_angular_acceptance = 0.5*SIPM_size/Radius;
+
     //--- define some materials
     TGeoMaterial *matVacuum = new TGeoMaterial("Vacuum", 0, 0, 0);
     TGeoMaterial *matAl = new TGeoMaterial("Al", 26.98, 13, 2.7);
@@ -68,4 +71,20 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
 
     geom->CloseGeometry();
 
+}
+
+bool Geometry::CheckDetector(const double* cpoint)
+{
+    double h = abs(cpoint[2]);
+
+    if(h>(0.5*(Height+Distance+SIPM_size)) || h<(0.5*(Height+Distance-SIPM_size))){return false;};
+
+    double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
+    if(abs(r-Radius)>1e-6){return false;};
+
+    double theta = atan(cpoint[1]/cpoint[0]);
+    double delta = theta/SIPM_angle - round(theta/SIPM_angle);
+    if(abs(delta) > SIPM_angular_acceptance/SIPM_angle){return false;};
+
+    return true;
 }

@@ -14,18 +14,18 @@ int main(int argc, char* argv[])
   double radius = 5.0;
   double height = 1.0;
   double distance = 25.;
-  double airgap = 1;
+  double airgap = .1;
   double althickness = 0.0016;
   double step = 0.001;
+  int n_SIPMS = 4;
 
   if(argc == 1) //Generates a single muon
   {
     Generator* gen = new Generator();
 
-    Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen);
+    Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen,n_SIPMS);
     T->Propagate_Muon();
     T->Propagate_Photons();
-
 
     cout<<endl<<"Total Photons Generated: "<<T->GetN_photons()<<endl;
     cout<<"Photons Absorbed: "<<T->GetN_absorbed()<<endl;
@@ -47,7 +47,9 @@ int main(int argc, char* argv[])
       Generator* gen = new Generator();
       for(int i=0;i<n_muons;i++)
       {
-        Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen);
+        cout<<endl<<"Muon: "<<i<<endl<<endl;
+
+        Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen,n_SIPMS);
         T->Propagate_Muon();
         T->Propagate_Photons();
         N_photons+=T->GetN_photons();
@@ -68,11 +70,7 @@ int main(int argc, char* argv[])
     }
   }
 
-  if(argc > 3 || (strncmp(argv[1],"-debug",100) && strncmp(argv[1],"-draw",100)) )
-  {
-    cout<<"Invalid Input"<<endl;
-    return 1;
-  }
+
 
   if(argc == 3 && !strncmp(argv[1],"-debug",100)) //Debug mode
   {
@@ -81,11 +79,18 @@ int main(int argc, char* argv[])
     {
       Generator* gen = new Generator(seed);
 
-      Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen);
+      Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen,n_SIPMS);
 
       T->Debug();
+
+      TApplication app("app", nullptr, nullptr);
+      T->Draw();
+      app.Run();
+
       cout<<"Generator Seed: "<<seed<<endl;
+      return 0;
     }
+
   }
 
   if(argc == 3 && !strncmp(argv[1],"-draw",100)) //Draw mode
@@ -95,7 +100,7 @@ int main(int argc, char* argv[])
     {
       Generator* gen = new Generator();
 
-      Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen);
+      Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen,n_SIPMS);
 
       T->Propagate_Muon();
       T->Propagate_Photons_DrawMode(n);
@@ -103,11 +108,17 @@ int main(int argc, char* argv[])
       TApplication app("app", nullptr, nullptr);
       T->Draw();
       app.Run();
+
+      cout<<endl<<"Total Photons Generated: "<<T->GetN_photons()<<endl;
+      cout<<"Photons Absorbed: "<<T->GetN_absorbed()<<endl;
+      cout<<"Photons Detected: "<<T->GetN_detected()<<endl;
+      cout<<"Photons Lost: "<<T->GetN_lost()<<endl;
+
+      return 0;
     }
 
   }
 
-
-
-  return 0;
+  cout<<"Invalid Input"<<endl;
+  return 1;
 }

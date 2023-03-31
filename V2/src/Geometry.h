@@ -18,20 +18,26 @@ public:
 	double GetHeight(){return Height;};
 	double GetRadius(){return Radius;};
 	TGeoManager* GetGeoManager(){return geom;};
+	bool CheckDetector(const double*);
 
 	// Build Telescope methods
-	void Build_MuonTelescope(double radius, double height, double distance,  double airgap, double althickness); // radius and height of scintillator and distance between scintillators
+	void Build_MuonTelescope(double radius, double height, double distance,  double airgap, double althickness,int n_SIPMS); // radius and height of scintillator and distance between scintillators
 
 protected:
     double Radius;
-		double innerradius;
-		double outerradius;
 		double Height;
 		double Distance;
-		double MaxHeight;
-		double MaxRadius;
+		double innerradius;
+		double outerradius;
 		double Thickness;
 		double Airgap;
+		double MaxHeight;
+		double MaxRadius;
+		int n_SIPM;
+		double SIPM_size;
+		double SIPM_angle;
+		double SIPM_angular_acceptance;
+
     TGeoManager* geom; //Manager pointer to geometry
 };
 

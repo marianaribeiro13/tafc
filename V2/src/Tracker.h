@@ -16,14 +16,14 @@ using namespace std;
 class Tracker : public Geometry
 {
 public:
-  Tracker(double,double,double,double,double,double,Generator*);
+  Tracker(double,double,double,double,double,double,Generator*,int);
   ~Tracker();
-  double CheckDensity();
+  double CheckDensity(); //Move to Geometry
   double Update_Energy(double);
-  bool CheckSameLocation();
+  bool CheckSameLocation(); //Move to Geometry?
   double FresnelLaw(double,double,double);
   bool CheckReflection(double,double,double);
-  vector<double> GetNormal();
+  vector<double> GetNormal(); 
   bool ReflectionHandler(int);
   bool VacuumToPlastic(double);
   bool VacuumToAluminium(double);

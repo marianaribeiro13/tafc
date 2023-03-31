@@ -1,10 +1,10 @@
 #include "Tracker.h"
 
-Tracker::Tracker(double radius, double height, double distance, double airgap, double althickness, double step, Generator* g)
+Tracker::Tracker(double radius, double height, double distance, double airgap, double althickness, double step, Generator* g, int n_SIPMS)
 : Geometry(), stepvalue(step), N_photons(0),N_absorbed(0),N_detected(0),N_lost(0),DoubleCross(false)
 {
   generator = g;
-  Build_MuonTelescope(radius, height, distance, airgap, althickness);
+  Build_MuonTelescope(radius, height, distance, airgap, althickness,n_SIPMS);
   Muon = generator->Generate_CosmicMuon(generator->Generate_Position(Distance,Height,Radius));
 
   auto f = [](double *x,double *par)
@@ -297,6 +297,11 @@ void Tracker::Propagate_Photons()
           Photon_Scintillator_Absorbtion(i,absorption_step-total_dist+geom->GetStep());
           break;
         }
+        if(CheckDetector(cpoint))
+        {
+          N_detected++;
+          break;
+        }
         Photon_Scintillator_Step(i);
 
       }
@@ -430,7 +435,11 @@ void Tracker::Propagate_Photons_DrawMode(int n)
           break;
         }
         Photon_Scintillator_Step(i);
-
+        if(CheckDetector(cpoint))
+        {
+          N_detected++;
+          break;
+        }
       }
 
       if(CheckDensity()==0)
@@ -449,7 +458,10 @@ void Tracker::Propagate_Photons_DrawMode(int n)
 
     if(geom->IsOutside()){N_lost++;};
   }
-
+  cout<<endl<<"Total Photons Generated: "<<n<<endl;
+  cout<<"Photons Absorbed: "<<N_absorbed<<endl;
+  cout<<"Photons Detected: "<<N_detected<<endl;
+  cout<<"Photons Lost: "<<N_lost<<endl;
   return;
 }
 
@@ -466,7 +478,7 @@ void Tracker::print_vector(const double* v)
 
 void Tracker::Debug()
 {
-  N_photons = 2;
+  N_photons = 1;
   for(int i=0;i<N_photons;i++)
   {
     cout<<"huh"<<endl;
@@ -504,6 +516,13 @@ void Tracker::Debug()
         cout<<endl;
 
         Photon_Scintillator_Step(i);
+        if(CheckDetector(cpoint))
+        {
+          print_vector(cpoint);
+          cout<<"Photon Detected"<<endl;
+          N_detected++;
+          break;
+        }
 
       }
 
