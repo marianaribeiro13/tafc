@@ -19,7 +19,7 @@ int main(int argc, char* argv[])
   double step = 0.001;
   int n_SIPMS = 4;
 
-  if(argc == 1) //Generates a single muon
+  if(argc == 1) //Simulates a single muon
   {
     Generator* gen = new Generator();
 
@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
     return 0;
   }
 
-  if(argc == 2)
+  if(argc == 2) //Simulates n muons
   {
     int n_muons=0;
     if(sscanf(argv[1],"%d",&n_muons))
@@ -70,9 +70,7 @@ int main(int argc, char* argv[])
     }
   }
 
-
-
-  if(argc == 3 && !strncmp(argv[1],"-debug",100)) //Debug mode
+  if(argc == 3 && !strncmp(argv[1],"-debug",100)) //Debug mode - Prints information about every photon
   {
     int seed=0;
     if(sscanf(argv[2],"%d",&seed))
@@ -93,7 +91,7 @@ int main(int argc, char* argv[])
 
   }
 
-  if(argc == 3 && !strncmp(argv[1],"-draw",100)) //Draw mode
+  if(argc == 3 && !strncmp(argv[1],"-draw",100)) //Draw mode - Single Muon and draw n photons
   {
     int n=0;
     if(sscanf(argv[2],"%d",&n))
@@ -108,6 +106,28 @@ int main(int argc, char* argv[])
       TApplication app("app", nullptr, nullptr);
       T->Draw();
       app.Run();
+
+      cout<<endl<<"Total Photons Generated: "<<T->GetN_photons()<<endl;
+      cout<<"Photons Absorbed: "<<T->GetN_absorbed()<<endl;
+      cout<<"Photons Detected: "<<T->GetN_detected()<<endl;
+      cout<<"Photons Lost: "<<T->GetN_lost()<<endl;
+
+      return 0;
+    }
+
+  }
+
+  if(argc == 3 && !strncmp(argv[1],"-seed",100)) //Seed mode - Single Muon with a given seed
+  {
+    int seed=0;
+    if(sscanf(argv[2],"%d",&seed))
+    {
+      Generator* gen = new Generator(seed);
+
+      Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen,n_SIPMS);
+
+      T->Propagate_Muon();
+      T->Propagate_Photons();
 
       cout<<endl<<"Total Photons Generated: "<<T->GetN_photons()<<endl;
       cout<<"Photons Absorbed: "<<T->GetN_absorbed()<<endl;

@@ -23,7 +23,7 @@ public:
   bool CheckSameLocation(); //Move to Geometry?
   double FresnelLaw(double,double,double);
   bool CheckReflection(double,double,double);
-  vector<double> GetNormal(); 
+  vector<double> GetNormal();
   bool ReflectionHandler(int);
   bool VacuumToPlastic(double);
   bool VacuumToAluminium(double);
@@ -47,6 +47,7 @@ public:
   int GetN_absorbed(){return N_absorbed;};
   int GetN_detected(){return N_detected;};
   int GetN_lost(){return N_lost;};
+  Particle* GetMuon(){return Muon;};
 
   //Draw Mode
   void Draw();

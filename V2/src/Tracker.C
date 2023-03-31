@@ -238,8 +238,10 @@ void Tracker::Muon_Scintillator_Step()
     Muon->IncreaseTime(stepvalue/(Muon->GetVelocity()*2.998e10));
     Muon->ChangePosition(cpoint);
     geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime());
+
     int n = generator->Generate_Photon_Number(10000*Update_Energy(stepvalue));
     N_photons+=n;
+
     for(int i=0;i<n;i++)
     {
 
@@ -280,7 +282,7 @@ void Tracker::Propagate_Photons()
 {
   for(int i=0;i<N_photons;i++)
   {
-
+    cout<<i<<endl;
     InitializePhotonTrack(i);
 
     double absorption_step = generator->Generate_Photon_Step();
@@ -297,13 +299,13 @@ void Tracker::Propagate_Photons()
           Photon_Scintillator_Absorbtion(i,absorption_step-total_dist+geom->GetStep());
           break;
         }
+
+        Photon_Scintillator_Step(i);
         if(CheckDetector(cpoint))
         {
           N_detected++;
           break;
         }
-        Photon_Scintillator_Step(i);
-
       }
 
       if(CheckDensity()==0)
@@ -478,7 +480,7 @@ void Tracker::print_vector(const double* v)
 
 void Tracker::Debug()
 {
-  N_photons = 1;
+  N_photons = 15;
   for(int i=0;i<N_photons;i++)
   {
     cout<<"huh"<<endl;
@@ -515,7 +517,9 @@ void Tracker::Debug()
         print_vector(geom->GetCurrentDirection());
         cout<<endl;
 
+
         Photon_Scintillator_Step(i);
+
         if(CheckDetector(cpoint))
         {
           print_vector(cpoint);
