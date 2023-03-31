@@ -282,7 +282,7 @@ void Tracker::Propagate_Photons()
 {
   for(int i=0;i<N_photons;i++)
   {
-    cout<<i<<endl;
+
     InitializePhotonTrack(i);
 
     double absorption_step = generator->Generate_Photon_Step();
@@ -480,7 +480,7 @@ void Tracker::print_vector(const double* v)
 
 void Tracker::Debug()
 {
-  N_photons = 15;
+  N_photons = 2;
   for(int i=0;i<N_photons;i++)
   {
     cout<<"huh"<<endl;
@@ -522,8 +522,9 @@ void Tracker::Debug()
 
         if(CheckDetector(cpoint))
         {
+
+          cout<<"Photon Detected at position: "<<ends;
           print_vector(cpoint);
-          cout<<"Photon Detected"<<endl;
           N_detected++;
           break;
         }
@@ -565,7 +566,7 @@ void Tracker::Debug()
   cout<<"Photons Absorbed: "<<N_absorbed<<endl;
   cout<<"Photons Detected: "<<N_detected<<endl;
   cout<<"Photons Lost: "<<N_lost<<endl;
-  Draw();
+
   return;
 
 }
