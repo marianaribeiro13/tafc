@@ -79,7 +79,13 @@ bool Tracker::CheckReflection(double thetai,double n1,double n2){
     double Reff = FresnelLaw(thetai, n1, n2);
 
     if(generator->Uniform(0,1) < Reff) {
-
+      if(CheckDensity() == 2.7){
+        if (generator->Uniform(0,1) < 0.924) //reflectance of Aluminium
+        {
+          return true;
+        }
+        else {return false;}
+      }
         return true;
 
     } else {
