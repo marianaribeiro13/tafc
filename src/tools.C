@@ -13,12 +13,16 @@ double tools::Norm(vector<double> v){
   return sqrt(n);
 }
 
-double tools::Angle_Between_Vectors(vector<double>& v1, vector<double>& v2){
-  
-  double dot = std::inner_product(v1.begin(), v1.end(), v2.begin(), 0);   
+double tools::Angle_Between_Vectors(vector<double> v1,vector<double> v2){
+
+  double dot=0;
+  for(int i=0;i<3;i++)
+  {
+    dot+= v1[i]*v2[i];
+  }
   double lenSq1 = v1[0]*v1[0] + v1[1]*v1[1] + v1[2]*v1[2];
   double lenSq2 = v2[0]*v2[0] + v2[1]*v2[1] + v2[2]*v2[2];
-  
+
   return acos(dot/sqrt(lenSq1 * lenSq2));
 }
 
@@ -28,7 +32,7 @@ double tools::SnellLaw(double thetai, double n1, double n2){
 }
 
 //Get reflected direction vector, from incident and normal vectors
-vector<double> tools::Get_Reflected_Dir(vector<double>& i, vector<double>& n){
+vector<double> tools::Get_Reflected_Dir(vector<double> i, vector<double> n){
 
   std::vector<double> r(3);
   //double x = ;
@@ -39,32 +43,29 @@ vector<double> tools::Get_Reflected_Dir(vector<double>& i, vector<double>& n){
 }
 
 //Get refracted direction vector, from incident and normal directions
-vector<double> tools::Get_Refracted_Dir(vector<double>& inc, vector<double>& n, double thetai, double n1, double n2){
-  
-  double r = n1 / n2;
-  double c = sqrt(1-r*r*sin(thetai)*sin(thetai));
+vector<double> tools::Get_Refracted_Dir(vector<double> i, vector<double> n, double thetai, double n1, double n2)
+{
 
+  double r = n1 / n2;
+  double c = std::inner_product(i.begin(), i.end(), n.begin(), 0.);
+  double s = r*r*(1-c*c);
   vector<double> aux(3);
-  for (int i=0; i<3; i++){
-    aux[i] = r*(inc[i]+cos(thetai)*n[i]) - c*n[i];
+  for (int j=0; j<3; j++){
+    aux[j] = r*i[j]+(r*c-sqrt(1-s))*n[j];
   }
 
-  return aux;
+  return tools::NormalizeVector(aux);
 }
 
-//Get refracted direction vector, from incident and normal directions
-/*vector<double> tools::Get_Refracted_Dir(vector<double>& inc, vector<double>& n, double thetai, double n1, double n2){
-  
-  const double r = n1 / n2;
-  const double sinT2 = r * r * (1.0 - cos(thetai) * cos(thetai));
-  if(sinT2 > 1.0) exit(0); // TIR
-  const double cosT = sqrt(1.0 - sinT2);
-  vector<double> aux(3);
-  for (int i=1; i<3; i++){
-    aux[i]=r*inc[i]+(-r*thetai -cosT)*n[i];
+vector<double> tools::NormalizeVector(vector<double> v)
+{
+  double norm = Norm(v);
+  for(int i=0;i<v.size();i++)
+  {
+    v[i]/=norm;
   }
-  return aux;
-}*/
+  return v;
+}
 
 
 vector<string> tools::Read_File(string name){
@@ -89,16 +90,43 @@ vector<string> tools::Read_File(string name){
   exit(0);
 }
 
-TSpline3* tools::Interpolate_Photon_Spectrum(string name){
+TSpline3* tools::Interpolate_From_File(string name)
+{
   vector<string> fs = tools::Read_File(name.c_str());
   vector<double> x,y;
-  for(int i=0;i<fs.size();i++)
+  for(int i=0;i<fs.size()-1;i++)
   {
     double a,b;
     sscanf(fs[i].c_str(),"%lf %lf",&a ,&b);
     x.push_back(a);
     y.push_back(b);
+
   }
-  auto I = new TSpline3("f",x.data(),y.data(),x.size());
+  auto I = new TSpline3("",x.data(),y.data(),x.size());
   return I;
+}
+
+
+void tools::print_vector(const double* v)
+{
+  cout<<v[0]<<" "<<v[1]<<" "<<v[2]<<endl;
+  return;
+}
+
+double tools::RadialTheta(const double *cpoint)
+{
+  if(cpoint[0]>0)
+  {
+    return atan(cpoint[1]/cpoint[0]);
+  }else
+  {
+    if(cpoint[1]>=0)
+    {
+      return atan(cpoint[1]/cpoint[0])+M_PI;
+    }else
+    {
+      return atan(cpoint[1]/cpoint[0])-M_PI;
+    }
+  }
+  return 0;
 }

@@ -1,6 +1,5 @@
 #include "Geometry.h"
-
-
+using namespace std;
 ///////////////////////////////// Constructor ///////////////////////////////
 
 Geometry::Geometry(){
@@ -9,10 +8,31 @@ Geometry::Geometry(){
 
 }
 
+Geometry::~Geometry()
+{
+    delete geom;
+
+}
 
 ///////////////////////////// Build Muon Telescope //////////////////////////
 
-void Geometry::Build_MuonTelescope(double radius, double height, double distance, double airgap, double althickness){
+void Geometry::Build_MuonTelescope(double radius, double height, double distance, double airgap, double althickness,int n_SIPMS,double s_size)
+{
+    Radius = radius;
+    Height = height;
+    Distance = distance;
+
+    innerradius = radius + airgap;
+    outerradius = radius +airgap+althickness;
+    Airgap = airgap;
+    Thickness = althickness;
+    MaxHeight = (distance/2+height+airgap+althickness)*1.2;
+    MaxRadius = 2*outerradius;
+
+    n_SIPM = n_SIPMS;
+    SIPM_size = s_size;
+    SIPM_angle = 2*M_PI / n_SIPM;
+    SIPM_alpha = 0.5*SIPM_size/(SIPM_angle*Radius);
 
     //--- define some materials
     TGeoMaterial *matVacuum = new TGeoMaterial("Vacuum", 0, 0, 0);
@@ -23,9 +43,9 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
     TGeoMedium *Vacuum = new TGeoMedium("Vacuum",1, matVacuum);
     TGeoMedium *Al = new TGeoMedium("Root Material",2, matAl);
     TGeoMedium *Plastic = new TGeoMedium("Root Material2",3, matPlastic);
- 
+
     //Create world volume
-    TGeoVolume* top = geom->MakeTube("TOP", Vacuum, 0, 15., 1.5*distance); // rmin, rmax, mid height
+    TGeoVolume* top = geom->MakeTube("TOP", Vacuum, 0, MaxRadius, MaxHeight); // rmin, rmax, mid height
     geom->SetTopVolume(top);
 
     //Define two transformations to position the scintillators
@@ -44,11 +64,11 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
     TGeoTranslation *tr4 = new TGeoTranslation(0., 0., height/2. + airgap + althickness/2.);
     TGeoTranslation *tr5 = new TGeoTranslation(0., 0., -(height/2. + airgap + althickness/2.));
 
-    TGeoVolume *sidetube = geom->MakeTube("lateral foil", Al, radius+airgap, radius+airgap+althickness, height/2. + 2*airgap);
+    TGeoVolume *sidetube = geom->MakeTube("lateral foil", Al, radius+airgap, radius+airgap+althickness, height/2. +althickness +airgap);
     TGeoVolume *covertube = geom->MakeTube("cover foil", Al, 0, radius+airgap+althickness, althickness/2.);
 
     TGeoVolume *foil = new TGeoVolumeAssembly("Aluminium foil");
-    foil->SetLineColor(kBlack);
+    foil->SetLineColor(kGray);
     foil->AddNode(sidetube, 1, tr3);
     foil->AddNode(covertube, 1, tr4);
     foil->AddNode(covertube, 2, tr5);
@@ -58,4 +78,41 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
 
     geom->CloseGeometry();
 
+}
+
+double Geometry::CheckDensity()
+{
+    return geom->GetCurrentNode()->GetVolume()->GetMedium()->GetMaterial()->GetDensity();
+}
+
+double Geometry::GetRefractiveIndex()
+{
+  if(CheckDensity() == 1.023)
+  {
+    return 1.58;
+  }
+  if(CheckDensity()==0)
+  {
+    return 1;
+  }else
+  {
+    return 1.58;
+  }
+  return 0;
+}
+
+bool Geometry::Check_Symmetric_Detector(const double* cpoint)
+{
+    double h = abs(cpoint[2]);
+
+    if(h>(0.5*(Height+Distance+SIPM_size)) || h<(0.5*(Height+Distance-SIPM_size))){return false;};
+
+    double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
+    if(abs(r-Radius)>1e-6){return false;};
+
+    double theta = atan(cpoint[1]/cpoint[0])/SIPM_angle;
+    double delta = theta - round(theta);
+    if(abs(delta) > SIPM_alpha){return false;};
+
+    return true;
 }

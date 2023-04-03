@@ -11,9 +11,26 @@ Generator::Generator(){
 
   //Create TF1 function with the 2D spectrum of the muon
   Momentum_Distribution = new TF1("f",f);
-
-  Photon_Spectrum = tools::Interpolate_Photon_Spectrum("Photon_Spectrum.txt");
+  Photon_Spectrum = tools::Interpolate_From_File("Photon_Spectrum.txt");
+  Detector_Efficiency = tools::Interpolate_From_File("Detector_Efficiency_Spectrum.txt");
 }
+
+Generator::Generator(int seed)
+{
+  Random = new TRandom(seed);
+
+   //2D Spectrum of the muon (x[0] is the momentum and x[1] is the incident angle)
+  auto f = [](double *x,double *par){
+       return pow(cos(x[1]),3)*0.00253*pow(x[0]*cos(x[1]),-(0.2455+1.288*log10(x[0]*cos(x[1]))-0.255*pow(log10(x[0]*cos(x[1])),2)+0.0209*pow(log10(x[0]*cos(x[1])),3) ));
+  };
+
+  //Create TF1 function with the 2D spectrum of the muon
+  Momentum_Distribution = new TF1("f",f);
+
+  Photon_Spectrum = tools::Interpolate_From_File("Photon_Spectrum.txt");
+  Detector_Efficiency = tools::Interpolate_From_File("Detector_Efficiency_Spectrum.txt");
+}
+
 
 Generator::~Generator(){};
 
@@ -63,11 +80,11 @@ double Generator::Random_Distribution(double xmin,double xmax,TF1 *F){
 
 }
 
-vector<double> Generator::Generate_Position(double d){
+vector<double> Generator::Generate_Position(double d,double h,double R){
 
-  double h=1,R=5.;
+
   vector<double> aux(3);
-  aux[2] = d/2+h;
+  aux[2] = d/2+h-1e-12;
   double r = Random->Uniform(0,R);
   double theta = Random->Uniform(0,2*M_PI);
   aux[0] = r * cos(theta);
@@ -112,30 +129,26 @@ int Generator::Generate_Photon_Number(double expected){
   return Random->Poisson(expected);
 }
 
-Particle* Generator::Generate_CosmicMuon(){
+Particle* Generator::Generate_CosmicMuon(vector<double> x)
+{
 
   //Generate random momentum and incident angle according to 2D pdf using acceptance-rejection
   vector<double> aux = Random_Distribution_2D(GetMomentumDistribution(),1,2000,0, TMath::Pi()/2, GetMomentumDistribution()->GetMaximum());
 
   //Create muon (pdg = 13)
-  Particle* muon = new Particle(13, aux[0]*1000, Generate_Direction_From_Theta(aux[1]));
+  Particle* muon = new Particle(13, aux[0]*1000, Generate_Direction_From_Theta(aux[1]),x);
 
   return muon;
 }
 
-Particle* Generator::Generate_Photon(){
+Particle* Generator::Generate_Photon(vector<double> x){
 
-  return new Particle(22 ,Generate_Photon_Energy(), Generate_Vector());
+  return new Particle(22 ,Generate_Photon_Energy(), Generate_Vector(),x);
 }
 
-/*double Generator::Generate_Photon_Step(){
 
-  return 380*log(1/(1-Random->Uniform(1)));
-}*/
 
 double Generator::Generate_Photon_Step(){
-/*
-  return -380*log(Uniform(0,1));
-}*/
+
   return 380*log(1/(1-Random->Uniform(1)));
 }

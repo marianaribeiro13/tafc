@@ -6,7 +6,7 @@
 ////////////////////////////// Constructors ////////////////////////////////////
 
 //If we know the momentum of the particle
-Particle::Particle(int const PDG,  double p, std::vector<double> const& d) : pdg(PDG), momentum(p){
+Particle::Particle(int const PDG,  double p, std::vector<double> const& d,vector<double> const& x) : pdg(PDG), momentum(p){
 
     //The TDatabasePDG particle database manager class creates a list of particles which by default is initialised from with the constants used by PYTHIA6
     //Get particle properties associated with given pdg
@@ -22,6 +22,9 @@ Particle::Particle(int const PDG,  double p, std::vector<double> const& d) : pdg
     energy = sqrt(momentum*momentum + mass*mass); //c=1
 
     direction = d;
+    StartingPosition = x;
+    Position = x;
+    time = 0;
 
 }
 
@@ -31,14 +34,15 @@ Particle::Particle(Particle* part) : pdg(part->pdg), mass(part->mass), energy(pa
     direction = part->direction;
 }
 
+void Particle::ChangePosition(const double *cpoint)
+{
+    for(int i=0;i<3;i++)
+    {
+        Position[i] = cpoint[i];
+    }
+    return;
+}
+
 //////////////////////////////////////// Destructor //////////////////////////////////////////////
 
 Particle::~Particle(){}
-
-////////////////////////////////////// Getters /////////////////////////////////////////
-std::vector<double> Particle::GetDirection(){
-
-    std::vector<double> d {direction[0], direction[1], direction[2]};
-
-    return d;
-}
