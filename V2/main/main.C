@@ -105,6 +105,7 @@ int main(int argc, char* argv[])
 
       T->Propagate_Muon();
       T->Propagate_Photons(n);
+      T->Draw_Map();
 
       cout<<endl<<"Total Photons Generated: "<<T->GetN_photons()<<endl;
       cout<<"Photons Absorbed: "<<T->GetN_absorbed()<<endl;

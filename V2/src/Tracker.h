@@ -10,6 +10,7 @@
 #include "TGeoNavigator.h"
 #include "TF1.h"
 #include "TCanvas.h"
+#include "TAxis.h"
 #include <cmath>
 using namespace std;
 
@@ -55,6 +56,7 @@ public:
 
   //Draw Mode
   void Draw();
+  void Draw_Map();
 
 private:
   double stepvalue;

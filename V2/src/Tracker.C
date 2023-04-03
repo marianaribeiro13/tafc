@@ -1,5 +1,10 @@
 #include "Tracker.h"
 
+vector<double> x_map_1;
+vector<double> y_map_1;
+vector<double> x_map_2;
+vector<double> y_map_2;
+
 Tracker::Tracker(double radius, double height, double distance, double airgap, double althickness, double step, Generator* g, int n_SIPMS)
 : Geometry(), stepvalue(step), N_photons(0),N_absorbed(0),N_detected(0),N_lost(0),DoubleCross(false)
 {
@@ -266,6 +271,25 @@ void Tracker::Propagate_Photons(int n)
         if(DetectionCheck(cpoint))
         {
           N_detected++;
+          double theta=acos(cpoint[0]/(sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]))); //normal with (1,0)
+          if (cpoint[1]<0)
+          {
+            theta=2*M_PI - theta;
+          }
+          if (cpoint[2]>0){
+            y_map_1.push_back(cpoint[2]-Distance/2);
+            x_map_1.push_back(theta*5);
+            //cout << "z scint1 " << cpoint[2] << endl;
+            //cout << "x scint1 " << theta*5 << endl;
+            //cout << "y scint1 " << cpoint[2]-Distance/2 << endl;
+          }
+          else{
+            y_map_2.push_back(cpoint[2]+Distance/2+Height);
+            x_map_2.push_back(theta*5);
+            //cout << "x scint2 " << theta*5 << endl;
+            //cout << "z scint2 " << cpoint[2] << endl;
+            //cout << "y scint2 " << cpoint[2]+Distance/2 << endl;
+          }
           break;
         }
       }else
@@ -384,4 +408,31 @@ void Tracker::Draw(){
     TCanvas *c1 = new TCanvas("c1","c1",1200,900);
     geom->GetTopVolume()->Draw();
     geom->DrawTracks("/*");
+}
+
+void Tracker::Draw_Map(){
+  if (x_map_1.size()!=0)
+  {
+    cout << "Detected in scintillator 1: " << x_map_1.size() << endl;
+    TCanvas *c3 = new TCanvas("c3","c3");
+    auto scint1 = new TGraph(x_map_1.size(),x_map_1.data(), y_map_1.data());
+    scint1->SetTitle("Distribution of photons lateral scintillator 1");
+    scint1->GetXaxis()->SetLimits(0,2*M_PI*Radius);
+    scint1->GetYaxis()->SetLimits(0,Height);
+    scint1->SetMarkerStyle(2);
+    scint1->Draw("AP");
+    c3->SaveAs("Scintillator1.pdf");
+  }
+  if (x_map_2.size()!=0)
+  {
+    cout << "Detected in scintillator 2: " << x_map_2.size() << endl;
+    TCanvas *c2 = new TCanvas("c2","c2");
+    auto scint2 = new TGraph(x_map_2.size(),x_map_2.data(), y_map_2.data());
+    scint2->SetTitle("Distribution of photons lateral scintillator 2");
+    scint2->GetXaxis()->SetLimits(0,2*M_PI*Radius);
+    scint2->GetYaxis()->SetLimits(0,Height);
+    scint2->SetMarkerStyle(2);
+    scint2->Draw("AP");
+    c2->SaveAs("Scintillator2.pdf");
+  }
 }
