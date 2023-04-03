@@ -10,8 +10,6 @@
 #include "TGeoNavigator.h"
 #include "TF1.h"
 #include "TCanvas.h"
-#include "TGraph.h"
-#include "TAxis.h"
 #include <cmath>
 using namespace std;
 
@@ -20,15 +18,16 @@ class Tracker : public Geometry
 public:
   Tracker(double,double,double,double,double,double,Generator*,int);
   ~Tracker();
-  double CheckDensity(); //Move to Geometry
+
   double Update_Energy(double);
-  bool CheckSameLocation(); //Move to Geometry?
+  bool CheckSameLocation();
   double FresnelLaw(double,double,double);
   bool CheckReflection(double,double,double);
   vector<double> GetNormal();
-  bool ReflectionHandler(int);
+  //bool ReflectionHandler(int); //Removed
   bool VacuumToPlastic(double);
   bool VacuumToAluminium(double);
+  bool DetectionCheck(const double*);
 
   /////Propagators/////
   void Propagate_Muon();
@@ -37,12 +36,14 @@ public:
   void Muon_Aluminium_Step();
 
 
-  void Propagate_Photons();
+  void Propagate_Photons(int n);
   void InitializePhotonTrack(int);
-  void Photon_Vacuum_Step(int);
-  void Photon_Scintillator_Step(int);
-  void Photon_Scintillator_Absorbtion(int,double);
-  void Photon_Aluminium_Step(int);
+  //void Photon_Scintillator_Step(int); //Removed
+  void Photon_Scintillator_Reflection_Check(int);
+  void Photon_Absorbtion(int,double);
+  //void Photon_Vacuum_Step(int); //Removed
+  void Photon_Vacuum_Reflection_Check(int);
+  //void Photon_Aluminium_Step(int); //Removed
 
   //Data
   int GetN_photons(){return N_photons;};
@@ -50,15 +51,10 @@ public:
   int GetN_detected(){return N_detected;};
   int GetN_lost(){return N_lost;};
   Particle* GetMuon(){return Muon;};
+  bool GetDoubleCross(){return DoubleCross;};
 
   //Draw Mode
   void Draw();
-  void Propagate_Photons_DrawMode(int);
-  void Draw_Map();
-
-  //Debug Mode//
-  void print_vector(const double*);
-  void Debug();
 
 private:
   double stepvalue;

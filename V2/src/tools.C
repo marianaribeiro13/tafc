@@ -103,3 +103,9 @@ TSpline3* tools::Interpolate_Photon_Spectrum(string name){
   auto I = new TSpline3("f",x.data(),y.data(),x.size());
   return I;
 }
+
+void tools::print_vector(const double* v)
+{
+  cout<<v[0]<<" "<<v[1]<<" "<<v[2]<<endl;
+  return;
+}

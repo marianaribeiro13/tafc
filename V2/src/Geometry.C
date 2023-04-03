@@ -16,16 +16,18 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
     Radius = radius;
     Height = height;
     Distance = distance;
+
     innerradius = radius + airgap;
     outerradius = radius +airgap+althickness;
     Airgap = airgap;
     Thickness = althickness;
     MaxHeight = (distance/2+height+airgap+althickness)*1.2;
     MaxRadius = 2*outerradius;
+
     n_SIPM = n_SIPMS;
     SIPM_size = .6;
     SIPM_angle = 2*M_PI / n_SIPM;
-    SIPM_angular_acceptance = 0.5*SIPM_size/Radius;
+    SIPM_alpha = 0.5*SIPM_size/(SIPM_angle*Radius);
 
     //--- define some materials
     TGeoMaterial *matVacuum = new TGeoMaterial("Vacuum", 0, 0, 0);
@@ -73,7 +75,28 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
 
 }
 
-bool Geometry::CheckDetector(const double* cpoint)
+double Geometry::CheckDensity()
+{
+    return geom->GetCurrentNode()->GetVolume()->GetMedium()->GetMaterial()->GetDensity();
+}
+
+double Geometry::GetRefractiveIndex()
+{
+  if(CheckDensity() == 1.023)
+  {
+    return 1.58;
+  }
+  if(CheckDensity()==0)
+  {
+    return 1;
+  }else
+  {
+    return 1.58;
+  }
+  return 0;
+}
+
+bool Geometry::Check_Symmetric_Detector(const double* cpoint)
 {
     double h = abs(cpoint[2]);
 
@@ -82,9 +105,9 @@ bool Geometry::CheckDetector(const double* cpoint)
     double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
     if(abs(r-Radius)>1e-6){return false;};
 
-    double theta = atan(cpoint[1]/cpoint[0]);
-    double delta = theta/SIPM_angle - round(theta/SIPM_angle);
-    if(abs(delta) > SIPM_angular_acceptance/SIPM_angle){return false;};
+    double theta = atan(cpoint[1]/cpoint[0])/SIPM_angle;
+    double delta = theta - round(theta);
+    if(abs(delta) > SIPM_alpha){return false;};
 
     return true;
 }

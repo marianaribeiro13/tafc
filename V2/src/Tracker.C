@@ -1,9 +1,5 @@
 #include "Tracker.h"
 
-vector<double> x_map_1;
-vector<double> y_map_1;
-vector<double> x_map_2;
-vector<double> y_map_2;
 Tracker::Tracker(double radius, double height, double distance, double airgap, double althickness, double step, Generator* g, int n_SIPMS)
 : Geometry(), stepvalue(step), N_photons(0),N_absorbed(0),N_detected(0),N_lost(0),DoubleCross(false)
 {
@@ -32,11 +28,13 @@ Tracker::Tracker(double radius, double height, double distance, double airgap, d
   cpoint = geom->GetCurrentPoint();
 }
 
-Tracker::~Tracker(){}
-
-double Tracker::CheckDensity()
+Tracker::~Tracker()
 {
-    return geom->GetCurrentNode()->GetVolume()->GetMedium()->GetMaterial()->GetDensity();
+  for(int i=0;i<Photons.size();i++)
+  {
+    delete Photons[i];
+  }
+  delete Muon;
 }
 
 double Tracker::Update_Energy(double step)
@@ -83,13 +81,7 @@ bool Tracker::CheckReflection(double thetai,double n1,double n2){
     double Reff = FresnelLaw(thetai, n1, n2);
 
     if(generator->Uniform(0,1) < Reff) {
-      if(CheckDensity() == 2.7){
-        if (generator->Uniform(0,1) < 0.924) //reflectance of Aluminium
-        {
-          return true;
-        }
-        else {return false;}
-      }
+
         return true;
 
     } else {
@@ -134,58 +126,6 @@ vector<double> Tracker::GetNormal()
   return aux;
 }
 
-bool Tracker::ReflectionHandler(int i)
-{
-  double n1=1,n2=1;
-  double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
-  vector<double> n = GetNormal();
-
-  if(CheckDensity() == 1.023)
-  {
-    n1 = 1.58;
-    n2 = 1;
-  }
-  if(CheckDensity() == 2.7)
-  {
-    n1 = 1.37;
-    n2 = 1;
-
-  }
-  if(VacuumToPlastic(r))
-  {
-    n1 =1;
-    n2 = 1.58;
-  }
-  if(VacuumToAluminium(r))
-  {
-    n1 = 1;
-    n2 = 1.37;
-
-
-  }
-  if(n1==n2){return false;};
-
-  double theta = tools::Angle_Between_Vectors(Photons[i]->GetDirection(),n);
-  if(CheckReflection(theta,n1,n2) )
-  {
-    vector<double> ndir = tools::Get_Reflected_Dir(Photons[i]->GetDirection(),n);
-    geom->SetCurrentDirection(ndir.data());
-    Photons[i]->ChangeDirection(ndir);
-
-    return true;
-
-  }else
-  {
-    vector<double> ndir = tools::Get_Refracted_Dir(Photons[i]->GetDirection(),n,theta,n1,n2);
-    geom->SetCurrentDirection(ndir.data());
-    Photons[i]->ChangeDirection(ndir);
-
-    return false;
-  }
-
-
-}
-
 bool Tracker::VacuumToPlastic(double r)
 {
   if(CheckDensity()==0 && ((abs(r-Radius) < 1e-6) || (abs(abs(cpoint[2])-(0.5*Distance+Height))<1e-6) || (abs(abs(cpoint[2])-(0.5*Distance))<1e-6))){return true;};
@@ -195,6 +135,15 @@ bool Tracker::VacuumToPlastic(double r)
 bool Tracker::VacuumToAluminium(double r)
 {
   if(CheckDensity()==0 && ((abs(r-innerradius) < 1e-6) || (abs(r-outerradius) <1e-6) || (abs(abs(cpoint[2])-(Airgap+(0.5*Distance+Height)))<1e-6)|| (abs(abs(cpoint[2])-(-Airgap+(0.5*Distance)))<1e-6) || (abs(abs(cpoint[2])-(Thickness+Airgap+(0.5*Distance+Height)))<1e-6) || (abs(abs(cpoint[2])-(-Thickness-Airgap+(0.5*Distance)))<1e-6) ) ){return true;};
+  return false;
+}
+
+bool Tracker::DetectionCheck(const double *cpoint)
+{
+  if(Check_Symmetric_Detector(cpoint) && generator->Uniform(0,1)<.3)
+  {
+    return true;
+  }
   return false;
 }
 
@@ -267,7 +216,7 @@ void Tracker::Muon_Scintillator_Step()
   int n = generator->Generate_Photon_Number(10000*Update_Energy(stepvalue));
   for(int i=0;i<n;i++)
   {
-    //cout<<"Photon: "<<N_photons-n+i+1<<endl;
+
     Photons.push_back(generator->Generate_Photon(Muon->GetPosition()));
   }
   return;
@@ -288,51 +237,56 @@ void Tracker::Muon_Aluminium_Step()
 //////////Photon Propagators//////////
 //////////Photon Propagators//////////
 
-void Tracker::Propagate_Photons()
+void Tracker::Propagate_Photons(int n)
 {
-  for(int i=0;i<N_photons;i++)
-  {
+  int m = N_photons/n;
 
+  for(int j=0;j<n;j++)
+  {
+    int i=m*j;
     InitializePhotonTrack(i);
 
     double absorption_step = generator->Generate_Photon_Step();
     double total_dist = 0;
-    int j=0;
     while(!geom->IsOutside())
     {
+      geom->FindNextBoundary();
+      geom->Step(kTRUE,kFALSE);
 
       if(CheckDensity()==1.023)
       {
-        geom->FindNextBoundary();
+
         if((total_dist+=geom->GetStep()) >=absorption_step)
         {
-          Photon_Scintillator_Absorbtion(i,absorption_step-total_dist+geom->GetStep());
+          Photon_Absorbtion(i,absorption_step-total_dist+geom->GetStep());
           break;
         }
 
-        Photon_Scintillator_Step(i);
-        if(CheckDetector(cpoint))
+        Photon_Scintillator_Reflection_Check(i);
+        if(DetectionCheck(cpoint))
         {
           N_detected++;
           break;
         }
-      }
-
-      if(CheckDensity()==0)
+      }else
       {
-        geom->FindNextBoundary();
-        Photon_Vacuum_Step(i);
+        if(CheckDensity()==0)
+        {
+
+          Photon_Vacuum_Reflection_Check(i);
+        }else
+        {
+          geom->FindNextBoundaryAndStep();
+        }
       }
 
-      if(CheckDensity()==2.7)
-      {
-        geom->FindNextBoundary();
-        Photon_Aluminium_Step(i);
-      }
-
+      Photons[i]->IncreaseTime(GetRefractiveIndex()*geom->GetStep()/(2.998e10));
+      Photons[i]->ChangePosition(cpoint);
+      geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Photons[i]->GetTime());
     }
 
     if(geom->IsOutside()){N_lost++;};
+
   }
 
   return;
@@ -348,24 +302,27 @@ void Tracker::InitializePhotonTrack(int i)
   return;
 }
 
-void Tracker::Photon_Scintillator_Step(int i)
+void Tracker::Photon_Scintillator_Reflection_Check(int i)
 {
-  geom->Step(kTRUE,kFALSE);
-  Photons[i]->IncreaseTime(1.58*geom->GetStep()/(2.998e10));
-  Photons[i]->ChangePosition(cpoint);
-  geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Photons[i]->GetTime());
+  vector<double> n = GetNormal();
+  double theta = tools::Angle_Between_Vectors(Photons[i]->GetDirection(),n);
 
-  if(!ReflectionHandler(i))
+  if(CheckReflection(theta,1.58,1) )
   {
+    vector<double> ndir = tools::Get_Reflected_Dir(Photons[i]->GetDirection(),n);
+    geom->SetCurrentDirection(ndir.data());
+    Photons[i]->ChangeDirection(ndir);
+  }else
+  {
+    vector<double> ndir = tools::Get_Refracted_Dir(Photons[i]->GetDirection(),n,theta,1.58,1);
+    geom->SetCurrentDirection(ndir.data());
+    Photons[i]->ChangeDirection(ndir);
     geom->FindNextBoundaryAndStep();
-    Photons[i]->IncreaseTime(1.58*geom->GetStep()/(2.998e10));
-    Photons[i]->ChangePosition(cpoint);
-    geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Photons[i]->GetTime());
   }
   return;
 }
 
-void Tracker::Photon_Scintillator_Absorbtion(int i, double step)
+void Tracker::Photon_Absorbtion(int i, double step)
 {
   geom->SetStep(step);
   geom->Step();
@@ -376,37 +333,43 @@ void Tracker::Photon_Scintillator_Absorbtion(int i, double step)
   return;
 }
 
-void Tracker::Photon_Vacuum_Step(int i)
+void Tracker::Photon_Vacuum_Reflection_Check(int i)
 {
-  geom->Step(kTRUE,kFALSE);
-  Photons[i]->IncreaseTime(geom->GetStep()/(2.998e10));
-  Photons[i]->ChangePosition(cpoint);
-  geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Photons[i]->GetTime());
 
-  if(!ReflectionHandler(i))
+  vector<double> n = GetNormal();
+  double theta = tools::Angle_Between_Vectors(Photons[i]->GetDirection(),n);
+
+  if(VacuumToPlastic(sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1])))
   {
-    geom->FindNextBoundaryAndStep();
-    Photons[i]->IncreaseTime(geom->GetStep()/(2.998e10));
-    Photons[i]->ChangePosition(cpoint);
-    geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Photons[i]->GetTime());
-  }
-  return;
-}
-
-void Tracker::Photon_Aluminium_Step(int i)
-{
-  geom->Step(kTRUE,kFALSE);
-  Photons[i]->IncreaseTime(1.37*geom->GetStep()/(2.998e10));
-  Photons[i]->ChangePosition(cpoint);
-  geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Photons[i]->GetTime());
-
-  if(!ReflectionHandler(i))
+    if(CheckReflection(theta,1,1.58) )
+    {
+      vector<double> ndir = tools::Get_Reflected_Dir(Photons[i]->GetDirection(),n);
+      geom->SetCurrentDirection(ndir.data());
+      Photons[i]->ChangeDirection(ndir);
+    }else
+    {
+      vector<double> ndir = tools::Get_Refracted_Dir(Photons[i]->GetDirection(),n,theta,1,1.58);
+      geom->SetCurrentDirection(ndir.data());
+      Photons[i]->ChangeDirection(ndir);
+      geom->FindNextBoundaryAndStep();
+    }
+  }else
   {
-    geom->FindNextBoundaryAndStep();
-    Photons[i]->IncreaseTime(1.37*geom->GetStep()/(2.998e10));
-    Photons[i]->ChangePosition(cpoint);
-    geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Photons[i]->GetTime());
+    if(generator->Uniform(0,1) < .87)
+    {
+      vector<double> ndir = tools::Get_Reflected_Dir(Photons[i]->GetDirection(),n);
+      geom->SetCurrentDirection(ndir.data());
+      Photons[i]->ChangeDirection(ndir);
+
+    }else
+    {
+      vector<double> ndir = tools::Get_Refracted_Dir(Photons[i]->GetDirection(),n,theta,1,1.37);
+      geom->SetCurrentDirection(ndir.data());
+      Photons[i]->ChangeDirection(ndir);
+      geom->FindNextBoundaryAndStep();
+    }
   }
+
   return;
 }
 
@@ -421,208 +384,4 @@ void Tracker::Draw(){
     TCanvas *c1 = new TCanvas("c1","c1",1200,900);
     geom->GetTopVolume()->Draw();
     geom->DrawTracks("/*");
-}
-
-void Tracker::Propagate_Photons_DrawMode(int n)
-{
-  int m = N_photons/n;
-
-  for(int j=0;j<n;j++)
-  {
-    int i=m*j;
-
-    InitializePhotonTrack(i);
-    double absorption_step = generator->Generate_Photon_Step();
-    double total_dist = 0;
-
-    while(!geom->IsOutside())
-    {
-
-      if(CheckDensity()==1.023)
-      {
-        geom->FindNextBoundary();
-        if((total_dist+=geom->GetStep()) >=absorption_step)
-        {
-          Photon_Scintillator_Absorbtion(i,absorption_step-total_dist+geom->GetStep());
-          break;
-        }
-        Photon_Scintillator_Step(i);
-        if(CheckDetector(cpoint))
-        {
-          N_detected++;
-          double theta=acos(cpoint[0]/(sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]))); //normal with (1,0)
-          if (cpoint[1]<0)
-          {
-            theta=2*M_PI - theta;
-          }
-          if (cpoint[2]>0){
-            y_map_1.push_back(cpoint[2]-Distance/2);
-            x_map_1.push_back(theta*5);
-            //cout << "z scint1 " << cpoint[2] << endl;
-            //cout << "x scint1 " << theta*5 << endl;
-            //cout << "y scint1 " << cpoint[2]-Distance/2 << endl;
-          }
-          else{
-            y_map_2.push_back(cpoint[2]+Distance/2+Height);
-            x_map_2.push_back(theta*5);
-            //cout << "x scint2 " << theta*5 << endl;
-            //cout << "z scint2 " << cpoint[2] << endl;
-            //cout << "y scint2 " << cpoint[2]+Distance/2 << endl;
-          }
-          break;
-        }
-      }
-
-      if(CheckDensity()==0)
-      {
-        geom->FindNextBoundary();
-        Photon_Vacuum_Step(i);
-      }
-
-      if(CheckDensity()==2.7)
-      {
-        geom->FindNextBoundary();
-        Photon_Aluminium_Step(i);
-      }
-
-    }
-
-    if(geom->IsOutside()){N_lost++;};
-  }
-  cout<<endl<<"Total Photons Generated: "<<n<<endl;
-  cout<<"Photons Absorbed: "<<N_absorbed<<endl;
-  cout<<"Photons Detected: "<<N_detected<<endl;
-  cout<<"Photons Lost: "<<N_lost<<endl;
-  return;
-}
-
-void Tracker::Draw_Map(){
-  if (x_map_1.size()!=0)
-  {
-    cout << "Detected in scintillator 1: " << x_map_1.size() << endl;
-    TCanvas *c3 = new TCanvas("c3","c3");
-    auto scint1 = new TGraph(x_map_1.size(),x_map_1.data(), y_map_1.data());
-    scint1->SetTitle("Distribution of photons lateral scintillator 1");
-    scint1->GetXaxis()->SetLimits(0,2*M_PI*Radius);
-    scint1->GetYaxis()->SetLimits(0,Height);
-    scint1->SetMarkerStyle(2);
-    scint1->Draw("AP");
-    c3->SaveAs("Scintillator1.pdf");
-  }
-  if (x_map_2.size()!=0)
-  {
-    cout << "Detected in scintillator 2: " << x_map_2.size() << endl;
-    TCanvas *c2 = new TCanvas("c2","c2");
-    auto scint2 = new TGraph(x_map_2.size(),x_map_2.data(), y_map_2.data());
-    scint2->SetTitle("Distribution of photons lateral scintillator 2");
-    scint2->GetXaxis()->SetLimits(0,2*M_PI*Radius);
-    scint2->GetYaxis()->SetLimits(0,Height);
-    scint2->SetMarkerStyle(2);
-    scint2->Draw("AP");
-    c2->SaveAs("Scintillator2.pdf");
-  }
-}
-
-/////////Debug Mode/////////
-/////////Debug Mode/////////
-/////////Debug Mode/////////
-/////////Debug Mode/////////
-/////////Debug Mode/////////
-
-void Tracker::print_vector(const double* v)
-{
-  cout<<v[0]<<" "<<v[1]<<" "<<v[2]<<endl;
-}
-
-void Tracker::Debug()
-{
-  N_photons = 2;
-  for(int i=0;i<N_photons;i++)
-  {
-    cout<<"huh"<<endl;
-    Photons.push_back(generator->Generate_Photon(generator->Generate_Position(Distance,Height-generator->Uniform(0,1)*Height,Radius)));
-  }
-
-  for(int i=0;i<N_photons;i++)
-  {
-    cout<<"Photon: "<<i<<endl;
-    InitializePhotonTrack(i);
-
-    double absorption_step = generator->Generate_Photon_Step();
-    double total_dist = 0;
-    cout<<"Absorbtion Step: "<<absorption_step<<endl;
-    cout<<"Photon Energy: "<<Photons[i]->GetEnergy()<<endl<<endl;
-    while(!geom->IsOutside())
-    {
-
-      if(CheckDensity()==1.023)
-      {
-        geom->FindNextBoundary();
-        if((total_dist+=geom->GetStep()) >=absorption_step)
-        {
-          print_vector(geom->GetCurrentDirection());
-          Photon_Scintillator_Absorbtion(i,absorption_step-total_dist+geom->GetStep());
-          cout<<"Photon Absorbed"<<endl;
-          break;
-        }
-        cout<<"Inside Scintillator"<<endl;
-        cout<<"Distance traveled inside scintillators: "<<total_dist<<endl;
-        cout<<"Position: "<<ends;
-        print_vector(cpoint);
-        cout<<"Direction: "<<ends;
-        print_vector(geom->GetCurrentDirection());
-        cout<<endl;
-
-
-        Photon_Scintillator_Step(i);
-
-        if(CheckDetector(cpoint))
-        {
-
-          cout<<"Photon Detected at position: "<<ends;
-          print_vector(cpoint);
-          N_detected++;
-          break;
-        }
-
-      }
-
-      if(CheckDensity()==0)
-      {
-        cout<<"In Vacuum"<<endl;
-        cout<<"Position: "<<ends;
-        print_vector(cpoint);
-        cout<<"Direction: "<<ends;
-        print_vector(geom->GetCurrentDirection());
-        cout<<endl;
-
-        geom->FindNextBoundary();
-        Photon_Vacuum_Step(i);
-      }
-
-      if(CheckDensity()==2.7)
-      {
-        cout<<"Inside Aluminium"<<endl;
-        cout<<"Position: "<<ends;
-        print_vector(cpoint);
-        cout<<"Direction: "<<ends;
-        print_vector(geom->GetCurrentDirection());
-        cout<<endl;
-
-        geom->FindNextBoundary();
-        Photon_Aluminium_Step(i);
-      }
-
-    }
-    cout<<"////////////////////"<<endl<<endl;
-    if(geom->IsOutside()){N_lost++;};
-  }
-
-  cout<<endl<<"Total Photons Generated: "<<N_photons<<endl;
-  cout<<"Photons Absorbed: "<<N_absorbed<<endl;
-  cout<<"Photons Detected: "<<N_detected<<endl;
-  cout<<"Photons Lost: "<<N_lost<<endl;
-
-  return;
-
 }
