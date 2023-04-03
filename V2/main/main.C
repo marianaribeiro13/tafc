@@ -102,6 +102,7 @@ int main(int argc, char* argv[])
 
       T->Propagate_Muon();
       T->Propagate_Photons_DrawMode(n);
+      T->Draw_Map();
 
       TApplication app("app", nullptr, nullptr);
       T->Draw();

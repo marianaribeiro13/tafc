@@ -10,6 +10,8 @@
 #include "TGeoNavigator.h"
 #include "TF1.h"
 #include "TCanvas.h"
+#include "TGraph.h"
+#include "TAxis.h"
 #include <cmath>
 using namespace std;
 
@@ -52,6 +54,7 @@ public:
   //Draw Mode
   void Draw();
   void Propagate_Photons_DrawMode(int);
+  void Draw_Map();
 
   //Debug Mode//
   void print_vector(const double*);
