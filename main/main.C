@@ -6,13 +6,28 @@
 #include "DataManager.h"
 #include "TApplication.h"
 #include <string>
-#include "omp.h"
-
+#include <chrono>
+//#include <thread>
 using namespace std;
+
+/*
+//function for multithreading
+void multiple_muons(Tracker *T)
+{
+  T->Propagate_Muon();
+  if(T->GetDoubleCross())
+  {
+    T->Propagate_Photons(T->GetN_photons());
+    //Data->Extract_Data(T,i);
+  }
+  delete T;
+}*/
 
 int main(int argc, char* argv[])
 {
-  int t0 = time(0),t1=0;
+  //int t0 = time(0),t1=0;
+  auto start = std::chrono::high_resolution_clock::now();
+
   double radius = 5.0;
   double height = 1.0;
   double distance = 25.;
@@ -22,7 +37,9 @@ int main(int argc, char* argv[])
   int n_SIPMS = 4;
   double SIPM_size = .6;
 
-  int nThreads, tid;
+  //int nThreads, tid;
+
+  //vector <thread> threads;
 
   if(argc == 1) //Simulates a single muon
   {
@@ -37,21 +54,34 @@ int main(int argc, char* argv[])
     cout<<"Photons Detected: "<<T->GetN_detected()<<endl;
     cout<<"Photons Lost: "<<T->GetN_lost()<<endl;
 
-    t1 = time(0);
-    cout<<"Time elapsed: "<<t1-t0<<" seconds"<<endl;
+    //t1 = time(0);
+    //cout<<"Time elapsed: "<<t1-t0<<" seconds"<<endl;
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<float> duration = end - start;
+    std::cout << duration.count() << "s " << std::endl;
+
     cout<<"Muons Simulated: "<<1<<endl;
     return 0;
   }
 
   if(argc == 2) //Simulates n muons
   {
-
     int n_muons=0;
     if(sscanf(argv[1],"%d",&n_muons))
     {
       DataManager *Data = new DataManager(n_muons);
       int N_photons=0,N_absorbed=0,N_detected=0,N_lost=0;
       Generator* gen = new Generator();
+      /*
+      //create multiple threads with the muons
+      for(int i=0;i<n_muons;i++)
+      {
+        cout<<endl<<"Muon: "<<i<<endl<<endl;
+        Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen,n_SIPMS,SIPM_size);
+        thread t(multiple_muons, T);
+        threads.push_back(move(t));
+      }*/
       for(int i=0;i<n_muons;i++)
       {
         cout<<endl<<"Muon: "<<i<<endl<<endl;
@@ -65,13 +95,23 @@ int main(int argc, char* argv[])
         }
         delete T;
       }
+      /*
+      //wait for threads to finish before carrying on
+      for(auto &t: threads){
+          t.join();
+        }*/
       for(int i=0;i<n_muons;i++)
       {
         Data->Print_Data(i);
       }
       Data->Draw_Efficiency_Graph();
-      t1 = time(0);
-      cout<<"Time elapsed: "<<t1-t0<<" seconds"<<endl;
+      //t1 = time(0);
+      //cout<<"Time elapsed: "<<t1-t0<<" seconds"<<endl;
+
+      auto end = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<float> duration = end - start;
+      std::cout << duration.count() << "s " << std::endl;
+
       cout<<"Muons Simulated: "<<n_muons<<endl;
       return 0;
     }
@@ -108,6 +148,10 @@ int main(int argc, char* argv[])
       cout<<"Photons Detected: "<<T->GetN_detected()<<endl;
       cout<<"Photons Lost: "<<T->GetN_lost()<<endl;
 
+      auto end = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<float> duration = end - start;
+      std::cout << duration.count() << "s " << std::endl;
+
 
       TApplication app("app", nullptr, nullptr);
       T->Draw();
@@ -136,8 +180,12 @@ int main(int argc, char* argv[])
       cout<<"Photons Detected: "<<T->GetN_detected()<<endl;
       cout<<"Photons Lost: "<<T->GetN_lost()<<endl;
 
-      t1 = time(0);
-      cout<<"Time elapsed: "<<t1-t0<<" seconds"<<endl;
+      //t1 = time(0);
+      //cout<<"Time elapsed: "<<t1-t0<<" seconds"<<endl;
+      auto end = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<float> duration = end - start;
+      std::cout << duration.count() << "s " << std::endl;
+
       cout<<"Muons Simulated: "<<1<<endl;
       return 0;
     }
