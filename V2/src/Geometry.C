@@ -8,10 +8,15 @@ Geometry::Geometry(){
 
 }
 
+Geometry::~Geometry()
+{
+    delete geom;
+
+}
 
 ///////////////////////////// Build Muon Telescope //////////////////////////
 
-void Geometry::Build_MuonTelescope(double radius, double height, double distance, double airgap, double althickness,int n_SIPMS)
+void Geometry::Build_MuonTelescope(double radius, double height, double distance, double airgap, double althickness,int n_SIPMS,double s_size)
 {
     Radius = radius;
     Height = height;
@@ -25,7 +30,7 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
     MaxRadius = 2*outerradius;
 
     n_SIPM = n_SIPMS;
-    SIPM_size = .6;
+    SIPM_size = s_size;
     SIPM_angle = 2*M_PI / n_SIPM;
     SIPM_alpha = 0.5*SIPM_size/(SIPM_angle*Radius);
 

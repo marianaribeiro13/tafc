@@ -22,9 +22,10 @@ public:
   static vector<double> Get_Reflected_Dir(vector<double> i, vector<double> n); //Get reflected direction vector, from incident and normal vectors
   static vector<double> Get_Refracted_Dir(vector<double> i, vector<double> n, double thetai, double n1, double n2); //Get refracted direction vector, from incident and normal directions
   static vector<string> Read_File(string); //Reads a file to a vector of strings
-  static TSpline3* Interpolate_Photon_Spectrum(string); //Receives a filename and outputs an interpolation
+  static TSpline3* Interpolate_From_File(string); //Receives a filename and outputs an interpolation
   static vector<double> NormalizeVector(vector<double>);
   static void print_vector(const double*);
+  static double RadialTheta(const double*);
   ~tools();
 
 

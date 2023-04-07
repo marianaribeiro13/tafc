@@ -9,26 +9,21 @@
 #include <fstream>
 #include <sstream>
 #include "TGraph2D.h"
+#include "TH2.h"
 
 class DataManager
 {
 public:
-  DataManager(int);
+  DataManager();
   ~DataManager();
-  void Extract_Data(Tracker*,int);
-  void Print_Data(int);
-  void Draw_Efficiency_Graph();
+  void Fill_Efficiency_Map(Tracker*);
+  void Draw_Efficiency_Map(string);
+  void Fill_Heatmap(Tracker*);
+  void Draw_Heatmap(string);
 private:
-  int size;
-  vector<double> x;
-  vector<double> y;
-  vector<double> ZenithAngle;
-  vector<int> N_photons;
-  vector<int> N_detected;
-  vector<double> Efficiency;
-  vector<int> N_absorbed;
-  vector<int> N_lost;
-  vector<int> DoubleCross;
+
+  TH2D *Efficiency_Map;
+  TH2D *Heatmap;
 
 };
 #endif

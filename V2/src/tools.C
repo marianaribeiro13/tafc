@@ -90,22 +90,43 @@ vector<string> tools::Read_File(string name){
   exit(0);
 }
 
-TSpline3* tools::Interpolate_Photon_Spectrum(string name){
+TSpline3* tools::Interpolate_From_File(string name)
+{
   vector<string> fs = tools::Read_File(name.c_str());
   vector<double> x,y;
-  for(int i=0;i<fs.size();i++)
+  for(int i=0;i<fs.size()-1;i++)
   {
     double a,b;
     sscanf(fs[i].c_str(),"%lf %lf",&a ,&b);
     x.push_back(a);
     y.push_back(b);
+
   }
-  auto I = new TSpline3("f",x.data(),y.data(),x.size());
+  auto I = new TSpline3("",x.data(),y.data(),x.size());
   return I;
 }
+
 
 void tools::print_vector(const double* v)
 {
   cout<<v[0]<<" "<<v[1]<<" "<<v[2]<<endl;
   return;
+}
+
+double tools::RadialTheta(const double *cpoint)
+{
+  if(cpoint[0]>0)
+  {
+    return atan(cpoint[1]/cpoint[0]);
+  }else
+  {
+    if(cpoint[1]>=0)
+    {
+      return atan(cpoint[1]/cpoint[0])+M_PI;
+    }else
+    {
+      return atan(cpoint[1]/cpoint[0])-M_PI;
+    }
+  }
+  return 0;
 }

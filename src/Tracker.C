@@ -1,6 +1,6 @@
 #include "Tracker.h"
 
-///////////////////////////// Constructer //////////////////////////////
+///////////////////////////// Constructor //////////////////////////////
 
 Tracker::Tracker(double radius, double height, double distance, double airgap, double althickness, double step, Generator* g, int n_SIPMS,double SIPM_size)
 : Geometry(), stepvalue(step), N_photons(0),N_absorbed(0),N_detected(0),N_lost(0),DoubleCross(false)
@@ -39,10 +39,10 @@ Tracker::Tracker(double radius, double height, double distance, double airgap, d
 
   //Setting both initial point and direction and finding the state
   geom->InitTrack(geom->GetCurrentTrack()->GetFirstPoint(), Muon->GetDirection().data());
-  
-  //Get pointer to current position (Whenever we update the position cpoint is updated, 
+
+  //Get pointer to current position (Whenever we update the position cpoint is updated,
   //since it is equal to the geom pointer to the current position)
-  cpoint = geom->GetCurrentPoint(); 
+  cpoint = geom->GetCurrentPoint();
 }
 
 ///////////////////////////////// Destructor ///////////////////////////////////
@@ -60,12 +60,11 @@ double Tracker::Update_Energy(double step)
   Muon->ChangeEnergy(Muon->GetEnergy()-dE); //Update energy
   Muon->ChangeMomentum(Muon->CalculateMomentum(Muon->GetEnergy())); //Update momentum
   return dE;
-
 }
 
 //Checks whether the next position (if we make the defined step value in the current particle direction)
 //is in the same node/volume of the current position
-bool Tracker::CheckSameLocation() //Parallel
+bool Tracker::CheckSameLocation()
 {
   double aux[3];
   for(int i=0;i<3;i++)
@@ -151,11 +150,11 @@ vector<double> Tracker::GetNormal()
 //Check if the particle is in vacuum near the scintillator boundary
 bool Tracker::VacuumToPlastic(double r)
 {
-  //If the particle is in vacuum (in the air gap) and near the lateral scintillator boundary 
+  //If the particle is in vacuum (in the air gap) and near the lateral scintillator boundary
   //or near one of the flat scintillator boundaries
-  if(CheckDensity()==0 && ((abs(r-Radius) < 1e-6) || (abs(abs(cpoint[2])-(0.5*Distance+Height))<1e-6) 
+  if(CheckDensity()==0 && ((abs(r-Radius) < 1e-6) || (abs(abs(cpoint[2])-(0.5*Distance+Height))<1e-6)
   || (abs(abs(cpoint[2])-(0.5*Distance))<1e-6))){return true;};
-  
+
   return false;
 }
 
@@ -163,24 +162,21 @@ bool Tracker::VacuumToPlastic(double r)
 bool Tracker::VacuumToAluminium(double r)
 {
   //If the particle is in vacuum (either in the air gap or outside the telescope) and near any aluminium foil boundary
-  if(CheckDensity()==0 && ((abs(r-innerradius) < 1e-6) || (abs(r-outerradius) <1e-6) 
-  || (abs(abs(cpoint[2])-(Airgap+0.5*Distance+Height))<1e-6) || (abs(abs(cpoint[2])-(-Airgap+(0.5*Distance)))<1e-6) 
+  if(CheckDensity()==0 && ((abs(r-innerradius) < 1e-6) || (abs(r-outerradius) <1e-6)
+  || (abs(abs(cpoint[2])-(Airgap+0.5*Distance+Height))<1e-6) || (abs(abs(cpoint[2])-(-Airgap+(0.5*Distance)))<1e-6)
   || (abs(abs(cpoint[2])-(Thickness+Airgap+0.5*Distance+Height))<1e-6) || (abs(abs(cpoint[2])-(-Thickness-Airgap+(0.5*Distance)))<1e-6) ) )
   {return true;};
-  
+
   return false;
 }
 
 //Check if photon is in the detector region and if it is detected according to the detector efficiency
 bool Tracker::DetectionCheck(const double *cpoint,double e)
 {
-
   if(Check_Symmetric_Detector(cpoint) && generator->Uniform(0,1)<generator->GetDetector_Efficiency()->Eval(e))
   {
-
     return true;
   }
-
   return false;
 }
 
@@ -194,7 +190,7 @@ bool Tracker::DetectionCheck(const double *cpoint,double e)
 void Tracker::Propagate_Muon()
 {
   //Variable that stores the number of times the particle crosses a scintillator
-  int scintillator_cross=0; 
+  int scintillator_cross=0;
 
   while(!geom->IsOutside()) //While the particle is inside the defined top volume
   {
@@ -247,7 +243,7 @@ void Tracker::Muon_Scintillator_Step()
     for(int i=0;i<n;i++)
     {
       //Add generated photon according to Scintillator spectrum to the vector of photons (to propagate later)
-      Photons.push_back(generator->Generate_Photon(Muon->GetPosition())); 
+      Photons.push_back(generator->Generate_Photon(Muon->GetPosition()));
       Photons[i]->IncreaseTime(Muon->GetTime()); //Assign current time to the photon
     }
   }
@@ -294,9 +290,9 @@ void Tracker::Propagate_Photons(int n)
   for(int j=0;j<n;j++)
   {
     int i=m*j;
-    InitializePhotonTrack(i); 
+    InitializePhotonTrack(i);
 
-    //Generate random step according to the probability of absorption of the photon 
+    //Generate random step according to the probability of absorption of the photon
     //(the distance the photon goes through in the material before being absorbed)
     double absorption_step = generator->Generate_Photon_Step();
     double total_dist = 0; //Distance traveled by the photon in the material
@@ -308,8 +304,8 @@ void Tracker::Propagate_Photons(int n)
 
       if(CheckDensity()==1.023) //Photon is in scintillator
       {
-        
-        //If the absorption distance generated (minus the already travelled distance in this material) is shorter than the distance to the next boundary, 
+
+        //If the absorption distance generated (minus the already travelled distance in this material) is shorter than the distance to the next boundary,
         //the photon is propagated until the point of absorption
         if((absorption_step - total_dist) < geom->GetStep())
         {
@@ -383,8 +379,8 @@ void Tracker::Photon_Scintillator_Reflection_Check(int i)
 {
   vector<double> n = GetNormal(); //Get normal to the next boundary
   double theta = tools::Angle_Between_Vectors(Photons[i]->GetDirection(),n); //Compute incident angle
-  
-  if(CheckReflection(theta,1.58,1)) //Photon is reflected 
+
+  if(CheckReflection(theta,1.58,1)) //Photon is reflected
   {
     vector<double> ndir = tools::Get_Reflected_Dir(Photons[i]->GetDirection(),n); //Get reflected direction
     geom->SetCurrentDirection(ndir.data()); //Set reflected direction the new direction
@@ -408,7 +404,7 @@ bool Tracker::Photon_Vacuum_Reflection_Check(int i)
   vector<double> n = GetNormal(); //Get normal to the next boundary
   double theta = tools::Angle_Between_Vectors(Photons[i]->GetDirection(),n); //Compute incident angle
   double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]); //Compute radial distance
-  
+
   if(VacuumToPlastic(r)) //Photon is in the air gap near the boundary of the scintillator
   {
     if(CheckReflection(theta,1,1.58)) //Photon is reflected
@@ -416,7 +412,7 @@ bool Tracker::Photon_Vacuum_Reflection_Check(int i)
       vector<double> ndir = tools::Get_Reflected_Dir(Photons[i]->GetDirection(),n); //Get reflected direction
       geom->SetCurrentDirection(ndir.data()); //Set reflected direction the new direction
       Photons[i]->ChangeDirection(ndir); //Update photon object direction
-    
+
     }else //Photon is transmited
     {
       vector<double> ndir = tools::Get_Refracted_Dir(Photons[i]->GetDirection(),n,theta,1,1.58); //Get refracted direction
@@ -466,7 +462,7 @@ void Tracker::Update_Photon_Track(int i){
 void Tracker::Draw(){
   //Create Canvas
   TCanvas *c1 = new TCanvas("c1","c1",1200,900);
-    
+
   geom->GetTopVolume()->Draw(); //Draw geometry
   // /D: Track and first level descendents only are drawn
   // /*: Track and all descendents are drawn

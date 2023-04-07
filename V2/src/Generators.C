@@ -11,8 +11,8 @@ Generator::Generator(){
 
   //Create TF1 function with the 2D spectrum of the muon
   Momentum_Distribution = new TF1("f",f);
-
-  Photon_Spectrum = tools::Interpolate_Photon_Spectrum("Photon_Spectrum.txt");
+  Photon_Spectrum = tools::Interpolate_From_File("Photon_Spectrum.txt");
+  Detector_Efficiency = tools::Interpolate_From_File("Detector_Efficiency_Spectrum.txt");
 }
 
 Generator::Generator(int seed)
@@ -27,7 +27,8 @@ Generator::Generator(int seed)
   //Create TF1 function with the 2D spectrum of the muon
   Momentum_Distribution = new TF1("f",f);
 
-  Photon_Spectrum = tools::Interpolate_Photon_Spectrum("Photon_Spectrum.txt");
+  Photon_Spectrum = tools::Interpolate_From_File("Photon_Spectrum.txt");
+  Detector_Efficiency = tools::Interpolate_From_File("Detector_Efficiency_Spectrum.txt");
 }
 
 
