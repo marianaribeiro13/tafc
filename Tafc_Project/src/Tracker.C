@@ -24,47 +24,32 @@ Tracker::Tracker(TGeoManager* geom, Generator* g, Particle* part, double step, d
   Muon = part;
 
   //The functions for adding navigators have a lock inside (they are thread safe)
-  //Get the current navigator for this thread (if it was already added - happens with more than one muon per thread)
+  //Get the current navigator for this thread (if it was already added 
+  //- happens if we create more than one Tracker object in the same thread)
   nav = geom->GetCurrentNavigator(); 
   if (!nav) nav = geom->AddNavigator();
-
-  //BetheBloch lambda function
-  auto f = [](double *x,double *par)
-  {
-    int Z=-1;
-    double c = 299792458;
-    double mp = 1.672621637e-27;
-    double me = 9.1093821499999992e-31;
-    double qe = 1.602176487e-19;
-    double na = 6.02214179e23;
-    double eps0 = 8.854187817e-12;
-    double n_density=3.33e29; // per m^3
-    double I = 1.03660828e-17;
-    return ((qe*qe*qe*qe*n_density*Z*Z*(log((2*me*c*c*x[0]*x[0])/(I*(1-x[0]*x[0])))-x[0]*x[0]))/(4*M_PI*eps0*eps0*me*c*c*x[0]*x[0]))/(1.602e-13);
-  };
-
-  BetheBloch = new TF1(Form("f_%u", nav->GetThreadId()),f); //Create BetheBloch TF1
-
-  //Setting both initial point and direction and finding the state
-  nav->InitTrack(Muon->GetStartingPosition().data(), Muon->GetDirection().data());
   
   //Get pointer to current position (Whenever we update the position cpoint is updated, 
   //since it is equal to the nav pointer to the current position)
   cpoint = nav->GetCurrentPoint(); 
+  //Get pointer to current direction (Whenever we update the direction cdir is updated, 
+  //since it is equal to the nav pointer to the current direction)
+  cdir = nav->GetCurrentDirection();
 }
 
 ///////////////////////////////// Destructor ///////////////////////////////////
 
 Tracker::~Tracker()
 {
-
-  delete Muon;
+  if(Muon){
+    delete Muon;
+  }
 }
 
 //Update energy and momentum of the particle after energy loss by BetheBloch equation
 double Tracker::Update_Energy(double step)
 {
-  double dE = BetheBloch->Eval(Muon->GetVelocity()) * (step/100); //step converted from cm to m
+  double dE = BetheBloch(Muon->GetVelocity()) * (step/100); //step converted from cm to m
   Muon->ChangeEnergy(Muon->GetEnergy()-dE); //Update energy
   Muon->ChangeMomentum(Muon->CalculateMomentum(Muon->GetEnergy())); //Update momentum
   return dE;
@@ -126,6 +111,7 @@ vector<double> Tracker::GetNormal()
   double h = abs(cpoint[2]);
   vector<double> aux(3);
   bool horizontal_reflection =false,vertical_reflection=false;
+  //vector<double> d = {cdir[0], cdir[1], cdir[2]};
   vector<double> d = {nav->GetCurrentDirection()[0],nav->GetCurrentDirection()[1],nav->GetCurrentDirection()[2]};
 
   if(abs(r-Radius) <1e-6 || abs(r-innerradius) <1e-6 || abs(r-outerradius) <1e-6)
@@ -204,6 +190,9 @@ void Tracker::Propagate_Muon()
   
   //Variable that stores the number of times the particle crosses a scintillator
   int scintillator_cross=0; 
+
+  //Setting both initial point and direction and finding the state
+  nav->InitTrack(Muon->GetStartingPosition().data(), Muon->GetDirection().data());
 
   while(!nav->IsOutside()) //While the particle is inside the defined top volume
   {
@@ -364,7 +353,6 @@ void Tracker::Propagate_Photons(int n)
     }
 
     delete Photons[i];
-    //if(geom->IsOutside()){N_lost++;};
 
   }
 
@@ -483,4 +471,33 @@ bool Tracker::Check_Symmetric_Detector()
     if(abs(delta) > SIPM_alpha){return false;};
 
     return true;
+}
+
+////////////////////////////////////// Bethe Bloch function to calculate energy loss in material //////////////////////////////////
+
+double Tracker::BetheBloch(double v){
+
+    int Z=-1;
+    double c = 299792458;
+    double mp = 1.672621637e-27;
+    double me = 9.1093821499999992e-31;
+    double qe = 1.602176487e-19;
+    double na = 6.02214179e23;
+    double eps0 = 8.854187817e-12;
+    double n_density=3.33e29; // per m^3
+    double I = 1.03660828e-17;
+
+    return ((qe*qe*qe*qe*n_density*Z*Z*(log((2*me*c*c*v*v)/(I*(1-v*v)))-v*v))/(4*M_PI*eps0*eps0*me*c*c*v*v))/(1.602e-13);
+}
+
+void Tracker::ChangeMuon(Particle* part){
+  if(Muon){
+    delete Muon;
+  }
+  Muon = part;
+  //Reset Photon information for the new muon
+  N_photons = 0; //number of emitted photons
+  N_absorbed = 0; //number of absorbed photons
+  N_detected = 0; //number of detected photons (using SIPMS)
+  N_lost = 0;
 }

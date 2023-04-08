@@ -152,5 +152,5 @@ Particle* Generator::Generate_Photon(vector<double> x){
 
 double Generator::Generate_Photon_Step(){
 
-  return 380*log(1/(1-Random->Uniform(1)));
+  return -380*log(Random->Uniform(1));
 }

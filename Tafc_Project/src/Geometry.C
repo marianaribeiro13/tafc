@@ -28,11 +28,6 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
     MaxHeight = (distance/2+height+airgap+althickness)*1.2;
     MaxRadius = 2*outerradius;
 
-    n_SIPM = n_SIPMS;
-    SIPM_size = s_size;
-    SIPM_angle = 2*M_PI / n_SIPM;
-    SIPM_alpha = 0.5*SIPM_size/(SIPM_angle*Radius);
-
     //--- define some materials
     TGeoMaterial *matVacuum = new TGeoMaterial("Vacuum", 0, 0, 0);
     TGeoMaterial *matAl = new TGeoMaterial("Al", 26.98, 13, 2.7);

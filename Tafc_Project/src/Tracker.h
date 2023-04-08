@@ -64,6 +64,9 @@ public:
 	double GetRefractiveIndex(); // Move to Geometry
 	bool Check_Symmetric_Detector();
 
+  double BetheBloch(double v);
+  void ChangeMuon(Particle* part);
+
 private:
 
   TGeoNavigator* nav;
@@ -71,8 +74,8 @@ private:
   Generator* generator; //pointer to generator object (generates random variables)
   Particle* Muon;
   vector<Particle*> Photons;
-  TF1* BetheBloch;
-  const double *cpoint;
+  const double *cpoint; // pointer to current position (fCurrentPoint of TGeoNavigator)
+  const double *cdir; // pointer to current position (fCurrentDir of TGeoNavigator)
 
 
   int N_photons; //number of emitted photons

@@ -15,12 +15,12 @@ void navigation_thread(TGeoManager* geom, double step, double radius, double hei
 double distance, double airgap, double althickness, int n_SIPMS, double SIPM_size, int i, int N_muons)
 {
   Generator* gen = new Generator(i); // I think this should be inside lock but it is working fine
-
+  
   for(int j; j < N_muons; j++){
+   
     //Locked stuff happens one thread at a time
     mu.lock(); //When we create a particle we create a TDatabasePDG instance (the same in every thread - seg fault) - that is why we lock
-    //Generator* gen = new Generator(i);
-    //Generate random muon in the scintillator incident plane
+    //Generate random muon in the scintillator incident plane and add it to the simulation
     Particle* Muon = gen->Generate_CosmicMuon(gen->Generate_Position(distance, height, radius));
     mu.unlock();
 
@@ -42,7 +42,7 @@ double distance, double airgap, double althickness, int n_SIPMS, double SIPM_siz
     mu.unlock();
 
   }
-
+  
   delete gen;
 }
 
