@@ -16,6 +16,7 @@ using namespace std;
 
 void Heatmap_Mode(Tracker*,DataManager*);
 void HeatmapSingle_Mode(Tracker*,DataManager*);
+void GeomEfficiency_Mode(Tracker*,DataManager*);
 void EMap_Mode(Tracker*,DataManager*);
 void Draw_Mode(Tracker*,DataManager*,int);
 void Simulation_Mode(Tracker*,DataManager*,char*);

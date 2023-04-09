@@ -14,10 +14,10 @@
 #include "TH2.h"
 using namespace std;
 
-class Tracker : public Geometry
+class Tracker
 {
 public:
-  Tracker(double,double,double,double,double,double,Generator*,int,double);
+  Tracker(double,Generator*,Geometry*);
   ~Tracker();
 
   double Update_Energy(double);
@@ -25,9 +25,10 @@ public:
   double FresnelLaw(double,double,double);
   bool CheckReflection(double,double,double);
   vector<double> GetNormal();
-  bool VacuumToPlastic(double);
-  bool VacuumToAluminium(double);
+
   bool DetectionCheck(const double*,double);
+  double CheckDensity();
+  double GetRefractiveIndex();
 
   /////Simulation Control/////
   void Reset();
@@ -65,12 +66,15 @@ public:
 private:
   double stepvalue;
   int MainTrackID;
+  int CurrentTrackID;
   Generator* generator;
   Particle* Muon;
   vector<Particle*> Photons;
   TF1* BetheBloch;
   const double *cpoint;
   TVirtualGeoTrack* main_track;
+  TVirtualGeoTrack* current_track;
+  TGeoNavigator* nav;
 
   int N_photons;
   int N_absorbed;
@@ -80,7 +84,7 @@ private:
   bool DoubleCross;
   bool Photons_flag;
 
-
+  Geometry* Geo;
 };
 
 #endif

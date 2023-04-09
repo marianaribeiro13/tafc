@@ -2,13 +2,15 @@
 
 ///////////////////////////// Constructor //////////////////////////////
 
-Tracker::Tracker(double radius, double height, double distance, double airgap, double althickness, double step, Generator* g, int n_SIPMS,double SIPM_size)
-: Geometry(), stepvalue(step), N_photons(0),N_absorbed(0),N_detected(0),N_lost(0)
+Tracker::Tracker(double step, Generator* g,Geometry* G)
+:  stepvalue(step), N_photons(0),N_absorbed(0),N_detected(0),N_lost(0)
 {
   generator = g;
-
+  Geo = G;
   //Build the Telescope Geometry
-  Build_MuonTelescope(radius, height, distance, airgap, althickness,n_SIPMS,SIPM_size);
+  nav = Geo->GetGeoManager()->GetCurrentNavigator();
+  if (!nav) nav = Geo->GetGeoManager()->AddNavigator();
+
 
   //BetheBloch lambda function
   auto f = [](double *x,double *par)
@@ -27,26 +29,21 @@ Tracker::Tracker(double radius, double height, double distance, double airgap, d
   BetheBloch = new TF1("f",f); //Create BetheBloch TF1
 
   //Generate Cosmic Muon at incident scintillator plane
-  Muon = generator->Generate_CosmicMuon(generator->Generate_Position(Distance,Height,Radius));
-
-  //Add muon track to the Navigator and assign it to main_track atribute
-  geom->AddTrack(0,Muon->GetPDG(),Muon);
-  main_track = geom->GetTrack(0);
-
-  //Add starting point to the track (initial position of the muon) and set main_track as the current track
+  Muon = generator->Generate_CosmicMuon(generator->Generate_Position(Geo->GetDistance(),Geo->GetHeight(),Geo->GetRadius()));
+  MainTrackID = Geo->GetGeoManager()->AddTrack(0,Muon->GetPDG(),Muon);
+  main_track = Geo->GetGeoManager()->GetTrack(MainTrackID);
   main_track->AddPoint(Muon->GetStartingPosition()[0],Muon->GetStartingPosition()[1],Muon->GetStartingPosition()[2],0);
-  geom->SetCurrentTrack(0);
-
-  //Setting both initial point and direction and finding the state
-  geom->InitTrack(geom->GetCurrentTrack()->GetFirstPoint(), Muon->GetDirection().data());
+  Geo->GetGeoManager()->SetCurrentTrack(main_track);
+  //Add muon track to the Navigator and assign it to main_track atribute
+  nav->InitTrack(Muon->GetStartingPosition().data(), Muon->GetDirection().data());
 
   //Get pointer to current position (Whenever we update the position cpoint is updated,
-  //since it is equal to the geom pointer to the current position)
-  cpoint = geom->GetCurrentPoint();
+  //since it is equal to the nav pointer to the current position)
+  cpoint = nav->GetCurrentPoint();
 
 
   Photons_flag = false; // This Flag Checks if the photons have been propagated or not
-  MainTrackID = 0;      //The ID of the main muon track
+  //MainTrackID = 0;      //The ID of the main muon track
   DoubleCross = false;  //This Flag Checks if the muon has crossed both detectors
 }
 
@@ -82,7 +79,7 @@ bool Tracker::CheckSameLocation()
   {
     aux[i] = cpoint[i] + stepvalue*Muon->GetDirection()[i];
   }
-  return geom->IsSameLocation(aux[0],aux[1],aux[2]);
+  return nav->IsSameLocation(aux[0],aux[1],aux[2]);
 }
 
 //Calculate probability of reflection at boundary
@@ -126,69 +123,64 @@ vector<double> Tracker::GetNormal()
 {
   double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
   double h = abs(cpoint[2]);
-  vector<double> aux(3);
-  bool horizontal_reflection =false,vertical_reflection=false;
-  vector<double> d = {geom->GetCurrentDirection()[0],geom->GetCurrentDirection()[1],geom->GetCurrentDirection()[2]};
+  vector<double> d = {nav->GetCurrentDirection()[0],nav->GetCurrentDirection()[1],nav->GetCurrentDirection()[2]};
 
-  if(abs(r-Radius) <1e-6 || abs(r-innerradius) <1e-6 || abs(r-outerradius) <1e-6)
-  {
 
-    vertical_reflection=true;
-    aux[0] = cpoint[0]/r;
-    aux[1] = cpoint[1]/r;
-    aux[2] = 0;
-  }
-  if((abs(h-(0.5*Distance+Height))<1e-6) || (abs(h-0.5*Distance)<1e-6) || (abs(h-(Airgap+(0.5*Distance)+Height))<1e-6)  || (abs(h-(-Airgap+(0.5*Distance)))<1e-6) || (abs(h-(Thickness+Airgap+(0.5*Distance)+Height))<1e-6) || (abs(h-(-Thickness-Airgap+(0.5*Distance)))<1e-6)  )
-  {
-    horizontal_reflection =true;
-    aux[0] = 0;
-    aux[1] = 0;
-    aux[2] = 1;
-  }
-  if(vertical_reflection && horizontal_reflection)// Corner reflection, photon goes back
-  {
-    return d;
-  }
 
-  if(tools::Angle_Between_Vectors(aux,d)>M_PI/2)
-  {
-    for(int i=0;i<3;i++){aux[i] = -aux[i];};
-  }
-
-  return aux;
+  return Geo->GetNormal(r,h,d,cpoint);
 }
 
 //Check if the particle is in vacuum near the scintillator boundary
-bool Tracker::VacuumToPlastic(double r)
-{
-  //If the particle is in vacuum (in the air gap) and near the lateral scintillator boundary
-  //or near one of the flat scintillator boundaries
-  if(CheckDensity()==0 && ((abs(r-Radius) < 1e-6) || (abs(abs(cpoint[2])-(0.5*Distance+Height))<1e-6)
-  || (abs(abs(cpoint[2])-(0.5*Distance))<1e-6))){return true;};
-
-  return false;
-}
+// bool Tracker::VacuumToPlastic(double r)
+// {
+//   //If the particle is in vacuum (in the air gap) and near the lateral scintillator boundary
+//   //or near one of the flat scintillator boundaries
+//   if(CheckDensity()==0 && ((abs(r-Radius) < 1e-6) || (abs(abs(cpoint[2])-(0.5*Distance+Height))<1e-6)
+//   || (abs(abs(cpoint[2])-(0.5*Distance))<1e-6))){return true;};
+//
+//   return false;
+// }
 
 //Check if the particle is in vacuum near aluminium foil
-bool Tracker::VacuumToAluminium(double r)
-{
-  //If the particle is in vacuum (either in the air gap or outside the telescope) and near any aluminium foil boundary
-  if(CheckDensity()==0 && ((abs(r-innerradius) < 1e-6) || (abs(r-outerradius) <1e-6)
-  || (abs(abs(cpoint[2])-(Airgap+0.5*Distance+Height))<1e-6) || (abs(abs(cpoint[2])-(-Airgap+(0.5*Distance)))<1e-6)
-  || (abs(abs(cpoint[2])-(Thickness+Airgap+0.5*Distance+Height))<1e-6) || (abs(abs(cpoint[2])-(-Thickness-Airgap+(0.5*Distance)))<1e-6) ) )
-  {return true;};
-
-  return false;
-}
+// bool Tracker::VacuumToAluminium(double r)
+// {
+//   double h = abs(abs(cpoint[2])-0.5*(Distance+Height));
+//
+//   if(CheckDensity()==0 && ((abs(r-innerradius) < 1e-6) || (abs(r-outerradius) <1e-6)
+//   ||abs(h-(Height/2+Airgap))<1e-6 )){return true;};
+//
+//   return false;
+// }
 
 //Check if photon is in the detector region and if it is detected according to the detector efficiency
 bool Tracker::DetectionCheck(const double *cpoint,double e)
 {
-  if(Check_Symmetric_Detector(cpoint) && generator->Uniform(0,1)<generator->GetDetector_Efficiency()->Eval(e))
+  if(Geo->Check_Symmetric_Detector(cpoint) && generator->Uniform(0,1)<generator->GetDetector_Efficiency()->Eval(e))
   {
     return true;
   }
   return false;
+}
+
+double Tracker::CheckDensity()
+{
+    return nav->GetCurrentNode()->GetVolume()->GetMedium()->GetMaterial()->GetDensity();
+}
+
+double Tracker::GetRefractiveIndex()
+{
+  if(CheckDensity() == 1.023)
+  {
+    return 1.58;
+  }
+  if(CheckDensity()==0)
+  {
+    return 1;
+  }else
+  {
+    return 1.58;
+  }
+  return 0;
 }
 
 //////////Simulation Control//////////
@@ -208,7 +200,7 @@ void Tracker::Reset()
     }
   }
   main_track->ResetTrack();
-
+  Geo->GetGeoManager()->SetCurrentTrack(main_track);
   Photons.clear();
   delete Muon;
   Photons_flag = false;
@@ -224,12 +216,11 @@ void Tracker::Reset()
 void Tracker::Generate_New_Muon()
 {
   Reset();
-  Muon = generator->Generate_CosmicMuon(generator->Generate_Position(Distance,Height,Radius));
+  Muon = generator->Generate_CosmicMuon(generator->Generate_Position(Geo->GetDistance(),Geo->GetHeight(),Geo->GetRadius()));
 
-  geom->GetTrack(MainTrackID)->AddPoint(Muon->GetStartingPosition()[0],Muon->GetStartingPosition()[1],Muon->GetStartingPosition()[2],0);
-  geom->SetCurrentTrack(MainTrackID);
-  geom->InitTrack(main_track->GetFirstPoint(), Muon->GetDirection().data());
-  cpoint = geom->GetCurrentPoint();
+  main_track->AddPoint(Muon->GetStartingPosition()[0],Muon->GetStartingPosition()[1],Muon->GetStartingPosition()[2],0);
+  nav->InitTrack(main_track->GetFirstPoint(), Muon->GetDirection().data());
+  cpoint = nav->GetCurrentPoint();
 
   return;
 }
@@ -240,10 +231,9 @@ void Tracker::Insert_New_Muon(Particle* M)
   Reset();
   Muon = M;
 
-  geom->GetTrack(MainTrackID)->AddPoint(Muon->GetStartingPosition()[0],Muon->GetStartingPosition()[1],Muon->GetStartingPosition()[2],0);
-  geom->SetCurrentTrack(MainTrackID);
-  geom->InitTrack(geom->GetCurrentTrack()->GetFirstPoint(), Muon->GetDirection().data());
-  cpoint = geom->GetCurrentPoint();
+  main_track->AddPoint(Muon->GetStartingPosition()[0],Muon->GetStartingPosition()[1],Muon->GetStartingPosition()[2],0);
+  nav->InitTrack(main_track->GetFirstPoint(), Muon->GetDirection().data());
+  cpoint = nav->GetCurrentPoint();
 
 
   return;
@@ -260,7 +250,7 @@ void Tracker::Propagate_Muon()
   //Variable that stores the number of times the particle crosses a scintillator
   int scintillator_cross=0;
 
-  while(!geom->IsOutside()) //While the particle is inside the defined top volume
+  while(!nav->IsOutside()) //While the particle is inside the defined top volume
   {
     if(CheckDensity()==0) //Particle is in vacuum
     {
@@ -284,10 +274,10 @@ void Tracker::Propagate_Muon()
 //Make vacuum step
 void Tracker::Muon_Vacuum_Step()
 {
-  geom->FindNextBoundaryAndStep(); //Make step to the next boundary and cross it (updates current position of the navigator)
-  Muon->IncreaseTime(geom->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
+  nav->FindNextBoundaryAndStep(); //Make step to the next boundary and cross it (updates current position of the navigator)
+  Muon->IncreaseTime(nav->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
   Muon->ChangePosition(cpoint); //Update muon object position
-  geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
+  main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
   return;
 }
 
@@ -295,14 +285,14 @@ void Tracker::Muon_Vacuum_Step()
 void Tracker::Muon_Scintillator_Step()
 {
   //Set next step to the defined arbitrary step value (defined by the constructer)
-  geom->SetStep(stepvalue);
+  nav->SetStep(stepvalue);
   while(CheckSameLocation()) //While the next step is still inside the same volume
   {
     //Execute step defined by SetStep (flag = kFALSE means it is an arbitrary step, not limited by geometrical reasons)
-    geom->Step(kFALSE); //Updates the current position of the navigator
+    nav->Step(kFALSE); //Updates the current position of the navigator
     Muon->IncreaseTime(stepvalue/(Muon->GetVelocity()*2.998e10)); //Update time
     Muon->ChangePosition(cpoint); //Update muon object position
-    geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
+    main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
 
     //Get number of photons from Poisson distribution (usually approximatly 1 photon per 100 eV for common scintillators)
     int n = generator->Generate_Photon_Number(10000*Update_Energy(stepvalue)); //Energy is converted to MeV
@@ -316,13 +306,13 @@ void Tracker::Muon_Scintillator_Step()
     }
   }
 
-  geom->FindNextBoundaryAndStep(stepvalue); //Make step to the next boundary and cross it (step is less than the defined step)
-  Muon->IncreaseTime(geom->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
+  nav->FindNextBoundaryAndStep(stepvalue); //Make step to the next boundary and cross it (step is less than the defined step)
+  Muon->IncreaseTime(nav->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
   Muon->ChangePosition(cpoint); //Update muon object position
-  geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
+  main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
 
   //Get number of photons from Poisson distribution (usually approximatly 1 photon per 100 eV for common scintillators)
-  int n = generator->Generate_Photon_Number(10000*Update_Energy(geom->GetStep()));
+  int n = generator->Generate_Photon_Number(10000*Update_Energy(nav->GetStep()));
   N_photons+=n; //Update total number of emited photons
 
   for(int i=0;i<n;i++)
@@ -337,10 +327,10 @@ void Tracker::Muon_Scintillator_Step()
 //Make aluminium step
 void Tracker::Muon_Aluminium_Step()
 {
-  geom->FindNextBoundaryAndStep(); //Make step to the next boundary and cross it (updates current position of the navigator)
-  Muon->IncreaseTime(geom->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
+  nav->FindNextBoundaryAndStep(); //Make step to the next boundary and cross it (updates current position of the navigator)
+  Muon->IncreaseTime(nav->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
   Muon->ChangePosition(cpoint); //Update muon object position
-  geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
+  main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
   return;
 }
 
@@ -367,13 +357,13 @@ void Tracker::Propagate_Photons()
     while(true)
     {
       //Find distance to the next boundary and set step
-      geom->FindNextBoundary();
-      geom->Step(kTRUE,kFALSE);
+      nav->FindNextBoundary();
+      nav->Step(kTRUE,kFALSE);
 
       if(CheckDensity()==1.023)
       {
 
-        if((total_dist+=geom->GetStep()) >=absorption_step)
+        if((total_dist+=nav->GetStep()) >=absorption_step)
         {
           N_absorbed++;
           break;
@@ -402,10 +392,10 @@ void Tracker::Propagate_Photons()
           break;
         }
       }
-
-      Photons[i]->IncreaseTime(GetRefractiveIndex()*geom->GetStep()/(2.998e10));
-      Photons[i]->ChangePosition(cpoint);
-      geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Photons[i]->GetTime());
+      Update_Photon_Track(i);
+      // Photons[i]->IncreaseTime(GetRefractiveIndex()*nav->GetStep()/(2.998e10));
+      // Photons[i]->ChangePosition(cpoint);
+      // nav->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Photons[i]->GetTime());
     }
     delete Photons[i];
   }
@@ -415,11 +405,12 @@ void Tracker::Propagate_Photons()
 void Tracker::InitializePhotonTrack(int i)
 {
   //Add daughter track (photon track) to the main track and set it the current track
-  geom->SetCurrentTrack(main_track->AddDaughter(i+1,Photons[i]->GetPDG(),Photons[i])); //id is set to i+1 because the main_track already has id=0
+  current_track =main_track->AddDaughter(i+1,Photons[i]->GetPDG(),Photons[i]);
+  Geo->GetGeoManager()->SetCurrentTrack(current_track); //id is set to i+1 because the main_track already has id=0
   //Add starting position to the track
-  geom->GetCurrentTrack()->AddPoint(Photons[i]->GetStartingPosition()[0],Photons[i]->GetStartingPosition()[1],Photons[i]->GetStartingPosition()[2],Photons[i]->GetTime());
+  current_track->AddPoint(Photons[i]->GetStartingPosition()[0],Photons[i]->GetStartingPosition()[1],Photons[i]->GetStartingPosition()[2],Photons[i]->GetTime());
   //Setting both initial point and direction and finding the state
-  geom->InitTrack(geom->GetCurrentTrack()->GetFirstPoint(), Photons[i]->GetDirection().data());
+  nav->InitTrack(Geo->GetGeoManager()->GetCurrentTrack()->GetFirstPoint(), Photons[i]->GetDirection().data());
   //geom->SetCurrentPoint(Photons[i]->GetStartingPosition().data());
   return;
 }
@@ -431,14 +422,14 @@ void Tracker::Photon_Scintillator_Reflection_Check(int i)
   if(CheckReflection(theta,1.58,1) )
   {
     vector<double> ndir = tools::Get_Reflected_Dir(Photons[i]->GetDirection(),n);
-    geom->SetCurrentDirection(ndir.data());
+    nav->SetCurrentDirection(ndir.data());
     Photons[i]->ChangeDirection(ndir);
 
   }else
   {
     vector<double> ndir = tools::Get_Refracted_Dir(Photons[i]->GetDirection(),n,theta,1.58,1);
-    geom->FindNextBoundaryAndStep();
-    geom->SetCurrentDirection(ndir.data());
+    nav->FindNextBoundaryAndStep();
+    nav->SetCurrentDirection(ndir.data());
     Photons[i]->ChangeDirection(ndir);
 
   }
@@ -451,28 +442,29 @@ bool Tracker::Photon_Vacuum_Reflection_Check(int i)
   vector<double> n = GetNormal();
   double theta = tools::Angle_Between_Vectors(Photons[i]->GetDirection(),n);
   double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
-  if(VacuumToPlastic(r))
+  double h = abs(abs(cpoint[2])-0.5*(Geo->GetDistance()+Geo->GetHeight()));
+  if(Geo->VacuumToPlastic(r,h))
   {
     if(CheckReflection(theta,1,1.58) )
     {
       vector<double> ndir = tools::Get_Reflected_Dir(Photons[i]->GetDirection(),n);
-      geom->SetCurrentDirection(ndir.data());
+      nav->SetCurrentDirection(ndir.data());
       Photons[i]->ChangeDirection(ndir);
     }else
     {
       vector<double> ndir = tools::Get_Refracted_Dir(Photons[i]->GetDirection(),n,theta,1,1.58);
-      geom->SetCurrentDirection(ndir.data());
+      nav->SetCurrentDirection(ndir.data());
       Photons[i]->ChangeDirection(ndir);
-      geom->FindNextBoundaryAndStep();
+      nav->FindNextBoundaryAndStep();
     }
   }else
   {
-    if(VacuumToAluminium(r))
+    if(Geo->VacuumToAluminium(r,h))
     {
       if(generator->Uniform(0,1) < .92)
       {
         vector<double> ndir = tools::Get_Reflected_Dir(Photons[i]->GetDirection(),n);
-        geom->SetCurrentDirection(ndir.data());
+        nav->SetCurrentDirection(ndir.data());
         Photons[i]->ChangeDirection(ndir);
         return true;
       }
@@ -486,9 +478,9 @@ bool Tracker::Photon_Vacuum_Reflection_Check(int i)
 
 void Tracker::Update_Photon_Track(int i){
 
-  Photons[i]->IncreaseTime(GetRefractiveIndex()*geom->GetStep()/(2.998e10)); //Update time
+  Photons[i]->IncreaseTime(GetRefractiveIndex()*nav->GetStep()/(2.998e10)); //Update time
   Photons[i]->ChangePosition(cpoint); //Update photon object position
-  geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Photons[i]->GetTime()); //Add new position to the track
+  current_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Photons[i]->GetTime()); //Add new position to the track
   return;
 }
 
@@ -510,17 +502,17 @@ void Tracker::Draw(int n)
 
     double absorption_step = generator->Generate_Photon_Step();
     double total_dist = 0;
-    int l =0;
+
     while(true) //This part is the same as the photon propagator
     {
 
-      geom->FindNextBoundary();
-      geom->Step(kTRUE,kFALSE);
+      nav->FindNextBoundary();
+      nav->Step(kTRUE,kFALSE);
 
       if(CheckDensity()==1.023)
       {
 
-        if((total_dist+=geom->GetStep()) >=absorption_step)
+        if((total_dist+=nav->GetStep()) >=absorption_step)
         {
           N_absorbed++;
           break;
@@ -550,17 +542,15 @@ void Tracker::Draw(int n)
         }
       }
 
-      Photons[i]->IncreaseTime(GetRefractiveIndex()*geom->GetStep()/(2.998e10));
-      Photons[i]->ChangePosition(cpoint);
-      geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Photons[i]->GetTime());
+      Update_Photon_Track(i);
     }
   }
 
   TCanvas *c1 = new TCanvas("c1","c1",1200,900);
-  geom->GetTopVolume()->Draw(); //Draw geometry
+  Geo->GetGeoManager()->GetTopVolume()->Draw(); //Draw geometry
   // /D: Track and first level descendents only are drawn
   // /*: Track and all descendents are drawn
-  geom->DrawTracks("/*"); //Draw tracks
+  Geo->GetGeoManager()->DrawTracks("/*"); //Draw tracks
 }
 
 //Fills the given Histogram with the detection points of all photons in the first scintillator
@@ -571,12 +561,12 @@ void Tracker::Fill_Heatmap(TH2D* H)
   {
 
     InitializePhotonTrack(i);
-    geom->FindNextBoundary();
-    geom->Step(kTRUE,kFALSE);
+    nav->FindNextBoundary();
+    nav->Step(kTRUE,kFALSE);
     if(cpoint[2]>0)
     {
       double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
-      if(abs(r-Radius)<1e-5)
+      if(abs(r-Geo->GetRadius())<1e-6)
       {
         H->Fill(tools::RadialTheta(cpoint),cpoint[2]-12.5);
       }
