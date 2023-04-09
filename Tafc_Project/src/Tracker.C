@@ -490,14 +490,3 @@ double Tracker::BetheBloch(double v){
     return ((qe*qe*qe*qe*n_density*Z*Z*(log((2*me*c*c*v*v)/(I*(1-v*v)))-v*v))/(4*M_PI*eps0*eps0*me*c*c*v*v))/(1.602e-13);
 }
 
-void Tracker::ChangeMuon(Particle* part){
-  if(Muon){
-    delete Muon;
-  }
-  Muon = part;
-  //Reset Photon information for the new muon
-  N_photons = 0; //number of emitted photons
-  N_absorbed = 0; //number of absorbed photons
-  N_detected = 0; //number of detected photons (using SIPMS)
-  N_lost = 0;
-}

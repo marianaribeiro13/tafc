@@ -65,7 +65,6 @@ public:
 	bool Check_Symmetric_Detector();
 
   double BetheBloch(double v);
-  void ChangeMuon(Particle* part);
 
 private:
 
@@ -77,11 +76,10 @@ private:
   const double *cpoint; // pointer to current position (fCurrentPoint of TGeoNavigator)
   const double *cdir; // pointer to current position (fCurrentDir of TGeoNavigator)
 
-
   int N_photons; //number of emitted photons
-  int N_absorbed; //number of absorbed photons
+  int N_absorbed; //number of absorbed photons in the scintillator
   int N_detected; //number of detected photons (using SIPMS)
-  int N_lost;
+  int N_lost; //number of photons absorbed in the aluminium
   bool DoubleCross;
 
   double Radius;

@@ -138,14 +138,14 @@ Particle* Generator::Generate_CosmicMuon(vector<double> x)
   vector<double> aux = Random_Distribution_2D(GetMomentumDistribution(),1,2000,0, TMath::Pi()/2, GetMomentumDistribution()->GetMaximum());
 
   //Create muon (pdg = 13)
-  Particle* muon = new Particle(13, aux[0]*1000, Generate_Direction_From_Theta(aux[1]),x);
+  Particle* muon = new Particle(13, 0.105658, aux[0]*1000, Generate_Direction_From_Theta(aux[1]),x);
 
   return muon;
 }
 
 Particle* Generator::Generate_Photon(vector<double> x){
 
-  return new Particle(22 ,Generate_Photon_Energy(), Generate_Vector(),x);
+  return new Particle(22 , 0, Generate_Photon_Energy(), Generate_Vector(),x);
 }
 
 

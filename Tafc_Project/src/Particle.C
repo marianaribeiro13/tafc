@@ -28,6 +28,22 @@ Particle::Particle(int const PDG,  double p, std::vector<double> const& d,vector
 
 }
 
+//If we know the momentum of the particle
+Particle::Particle(int const PDG,  double m, double p, std::vector<double> const& d,vector<double> const& x) : pdg(PDG), momentum(p){
+    
+    //Convert mass to MeV
+    mass = m*1000;
+
+    //Compute energy in natural units
+    energy = sqrt(momentum*momentum + mass*mass); //c=1
+
+    direction = d;
+    StartingPosition = x;
+    Position = x;
+    time = 0;
+
+}
+
 //Copy Constructor
 Particle::Particle(Particle* part) : pdg(part->pdg), mass(part->mass), energy(part->energy), momentum(part->momentum){
 
