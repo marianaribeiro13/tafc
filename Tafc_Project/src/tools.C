@@ -113,7 +113,7 @@ void tools::print_vector(const double* v)
   return;
 }
 
-double tools::RadialTheta(const double *cpoint)
+double tools::PhiAngle(const double *cpoint)
 {
   if(cpoint[0]>0)
   {

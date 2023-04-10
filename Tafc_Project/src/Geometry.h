@@ -20,7 +20,7 @@ public:
 	TGeoManager* GetGeoManager(){return geom;};
 
 	// Build Telescope methods
-	void Build_MuonTelescope(double radius, double height, double distance,  double airgap, double althickness,int n_SIPMS,double SIPM_size); // radius and height of scintillator and distance between scintillators
+	void Build_MuonTelescope(double radius, double height, double distance,  double airgap, double althickness); // radius and height of scintillator and distance between scintillators
 
 protected:
     double Radius;

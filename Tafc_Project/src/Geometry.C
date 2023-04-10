@@ -15,7 +15,7 @@ Geometry::~Geometry()
 
 ///////////////////////////// Build Muon Telescope //////////////////////////
 
-void Geometry::Build_MuonTelescope(double radius, double height, double distance, double airgap, double althickness,int n_SIPMS,double s_size)
+void Geometry::Build_MuonTelescope(double radius, double height, double distance, double airgap, double althickness)
 {
     Radius = radius;
     Height = height;

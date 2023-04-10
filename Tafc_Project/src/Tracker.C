@@ -1,8 +1,14 @@
 #include "Tracker.h"
+#include <mutex>
 
+//#define DRAWMODE
+
+#ifdef DRAWMODE
+std::mutex Mutex;
+#endif 
 ///////////////////////////// Constructer //////////////////////////////
 
-Tracker::Tracker(TGeoManager* geom, Generator* g, Particle* part, double step, double radius, double height, double distance, double airgap, double althickness, int n_SIPMS,double s_size)
+Tracker::Tracker(TGeoManager* GeoM, Generator* g, Particle* part, double step, double radius, double height, double distance, double airgap, double althickness, int n_SIPMS,double s_size, std::vector <double> s_angles)
 : stepvalue(step), N_photons(0),N_absorbed(0),N_detected(0),N_lost(0),DoubleCross(false)
 {
   Radius = radius;
@@ -18,16 +24,32 @@ Tracker::Tracker(TGeoManager* geom, Generator* g, Particle* part, double step, d
   SIPM_size = s_size;
   SIPM_angle = 2*M_PI / n_SIPM;
   SIPM_alpha = 0.5*SIPM_size/(SIPM_angle*Radius);
+  SIPM_phi_range = SIPM_size/Radius;
+  SIPM_angles = s_angles;
 
-  generator = g;
-
-  Muon = part;
+  geom = GeoM; //Assign pointer to TGeoManager object
+  generator = g; //Assign pointer to Generator object
+  Muon = part; //Assign pointer to Particle object
+  main_track = nullptr; //Just in case draw mode is not defined (not sure if this should be done)
 
   //The functions for adding navigators have a lock inside (they are thread safe)
   //Get the current navigator for this thread (if it was already added 
   //- happens if we create more than one Tracker object in the same thread)
   nav = geom->GetCurrentNavigator(); 
   if (!nav) nav = geom->AddNavigator();
+
+#ifdef DRAWMODE
+  Mutex.lock();
+  //Add muon track to the Navigator and assign it to main_track atribute
+  int track_index = geom->AddTrack(0,Muon->GetPDG(),Muon); //The first argument is not important
+  Mutex.unlock();
+
+  main_track = geom->GetTrack(track_index); //Get muon track
+  //Add starting point to the track (initial position of the muon) and set main_track as the current track
+  main_track->AddPoint(Muon->GetStartingPosition()[0],Muon->GetStartingPosition()[1],Muon->GetStartingPosition()[2],0);
+  geom->SetCurrentTrack(track_index);
+ 
+#endif
   
   //Get pointer to current position (Whenever we update the position cpoint is updated, 
   //since it is equal to the nav pointer to the current position)
@@ -35,6 +57,10 @@ Tracker::Tracker(TGeoManager* geom, Generator* g, Particle* part, double step, d
   //Get pointer to current direction (Whenever we update the direction cdir is updated, 
   //since it is equal to the nav pointer to the current direction)
   cdir = nav->GetCurrentDirection();
+
+  Photons_flag = false; // This Flag Checks if the photons have been propagated or not
+  //MainTrackID = 0;      //The ID of the main muon track
+  DoubleCross = false;  //This Flag Checks if the muon has crossed both scintillators
 }
 
 ///////////////////////////////// Destructor ///////////////////////////////////
@@ -44,6 +70,14 @@ Tracker::~Tracker()
   if(Muon){
     delete Muon;
   }
+  //if(!Photons_flag)
+  //{
+    for(int i =0;i<Photons.size();i++){
+      if(Photons[i]){
+        delete Photons[i];
+      }
+    }
+  //}
 }
 
 //Update energy and momentum of the particle after energy loss by BetheBloch equation
@@ -178,6 +212,19 @@ bool Tracker::DetectionCheck(double e)
   return false;
 }
 
+//Check if photon is in the detector region and if it is detected according to the detector efficiency
+bool Tracker::Is_Photon_Detected(double E)
+{
+
+  if(Is_Detector_Region() && generator->Uniform(0,1)<generator->GetDetector_Efficiency()->Eval(E))
+  {
+
+    return true;
+  }
+
+  return false;
+}
+
 
 //////////Muon Propagators//////////
 //////////Muon Propagators//////////
@@ -209,8 +256,17 @@ void Tracker::Propagate_Muon()
     {
       Muon_Aluminium_Step();
     }
-    if(scintillator_cross == 2){DoubleCross=true;}; //The particle crosses both scintillators
+  }
 
+  if(scintillator_cross < 2){ //The particle crosses both scintillators
+#ifdef DRAWMODE
+    //Mutex.lock();
+    //geom->ClearTracks();
+    main_track->ResetTrack();
+    //Mutex.unlock();
+#endif
+  }else { 
+    DoubleCross=true;
   }
 
   return;
@@ -220,8 +276,13 @@ void Tracker::Propagate_Muon()
 void Tracker::Muon_Vacuum_Step()
 {
   nav->FindNextBoundaryAndStep(); //Make step to the next boundary and cross it (updates current position of the navigator)
-  Muon->IncreaseTime(nav->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
   Muon->ChangePosition(cpoint); //Update muon object position
+#ifdef DRAWMODE
+  //Mutex.lock();
+  Muon->IncreaseTime(nav->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
+  main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
+  //Mutex.unlock();
+#endif
   return;
 }
 
@@ -234,9 +295,13 @@ void Tracker::Muon_Scintillator_Step()
   {
     //Execute step defined by SetStep (flag = kFALSE means it is an arbitrary step, not limited by geometrical reasons)
     nav->Step(kFALSE); //Updates the current position of the navigator
-    Muon->IncreaseTime(stepvalue/(Muon->GetVelocity()*2.998e10)); //Update time
     Muon->ChangePosition(cpoint); //Update muon object position
-
+#ifdef DRAWMODE
+    //Mutex.lock();
+    Muon->IncreaseTime(stepvalue/(Muon->GetVelocity()*2.998e10)); //Update time
+    main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
+    //Mutex.unlock();
+#endif
     //Get number of photons from Poisson distribution (usually approximatly 1 photon per 100 eV for common scintillators)
     int n = generator->Generate_Photon_Number(10000*Update_Energy(stepvalue)); //Energy is converted to MeV
     N_photons+=n; //Update total number of emited photons
@@ -250,9 +315,13 @@ void Tracker::Muon_Scintillator_Step()
   }
 
   nav->FindNextBoundaryAndStep(stepvalue); //Make step to the next boundary and cross it (step is less than the defined step)
-  Muon->IncreaseTime(nav->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
   Muon->ChangePosition(cpoint); //Update muon object position
-
+#ifdef DRAWMODE
+  //Mutex.lock();
+  Muon->IncreaseTime(nav->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
+  main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
+  //Mutex.unlock();
+#endif
   //Get number of photons from Poisson distribution (usually approximatly 1 photon per 100 eV for common scintillators)
   int n = generator->Generate_Photon_Number(10000*Update_Energy(nav->GetStep()));
   N_photons+=n; //Update total number of emited photons
@@ -271,8 +340,13 @@ void Tracker::Muon_Scintillator_Step()
 void Tracker::Muon_Aluminium_Step()
 {
   nav->FindNextBoundaryAndStep(); //Make step to the next boundary and cross it (updates current position of the navigator)
-  Muon->IncreaseTime(nav->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
   Muon->ChangePosition(cpoint); //Update muon object position
+#ifdef DRAWMODE
+  //Mutex.lock();
+  Muon->IncreaseTime(nav->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
+  main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
+  //Mutex.unlock();
+#endif
   return;
 }
 
@@ -284,13 +358,18 @@ void Tracker::Muon_Aluminium_Step()
 
 void Tracker::Propagate_Photons(int n)
 {
-  int m = N_photons/n;
+  Photons_flag = true;
 
+  int m = N_photons/n;
   for(int j=0;j<n;j++)
   {
     int i=m*j;
     nav->InitTrack(Photons[i]->GetStartingPosition().data(), Photons[i]->GetDirection().data());
-
+#ifdef DRAWMODE
+    //Mutex.lock();
+    InitializePhotonTrack(i);
+    //Mutex.unlock();
+#endif
     //Generate random step according to the probability of absorption of the photon 
     //(the distance the photon goes through in the material before being absorbed)
     double absorption_step = generator->Generate_Photon_Step();
@@ -324,7 +403,7 @@ void Tracker::Propagate_Photons(int n)
           Photon_Scintillator_Reflection_Check(i);
         }
 
-        if(DetectionCheck(Photons[i]->GetEnergy())) //Check if photon is detected
+        if(Is_Photon_Detected(Photons[i]->GetEnergy())) //Check if photon is detected
         {
           N_detected++;
           break;
@@ -352,13 +431,24 @@ void Tracker::Propagate_Photons(int n)
       }
     }
 
-    delete Photons[i];
+    //delete Photons[i];
+    //std::cout << Photons.size() << '\n';
 
   }
 
   return;
 }
 
+void Tracker::InitializePhotonTrack(int i)
+{
+
+  //Add daughter track (photon track) to the main track and set it the current track
+  geom->SetCurrentTrack(main_track->AddDaughter(0,Photons[i]->GetPDG(),Photons[i])); //the first argument is not important
+  //Add starting position to the track
+  geom->GetCurrentTrack()->AddPoint(Photons[i]->GetStartingPosition()[0],Photons[i]->GetStartingPosition()[1],Photons[i]->GetStartingPosition()[2],Photons[i]->GetTime());
+
+  return;
+}
 
 //Check if the photon in the scintillator is reflected in the boundary with the air gap
 void Tracker::Photon_Scintillator_Reflection_Check(int i)
@@ -432,8 +522,13 @@ bool Tracker::Photon_Vacuum_Reflection_Check(int i)
 
 void Tracker::Update_Photon(int i){
 
-  Photons[i]->IncreaseTime(GetRefractiveIndex()*nav->GetStep()/(2.998e10)); //Update time
   Photons[i]->ChangePosition(cpoint); //Update photon object position
+#ifdef DRAWMODE
+  //Mutex.lock();
+  Photons[i]->IncreaseTime(GetRefractiveIndex()*nav->GetStep()/(2.998e10)); //Update time
+  geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Photons[i]->GetTime()); //Add new position to the track
+  //Mutex.unlock();
+#endif
 }
 
 double Tracker::CheckDensity()
@@ -459,18 +554,41 @@ double Tracker::GetRefractiveIndex()
 
 bool Tracker::Check_Symmetric_Detector()
 {
-    double h = abs(cpoint[2]);
+  double h = abs(cpoint[2]);
 
-    if(h>(0.5*(Height+Distance+SIPM_size)) || h<(0.5*(Height+Distance-SIPM_size))){return false;};
+  if(h>(0.5*(Height+Distance+SIPM_size)) || h<(0.5*(Height+Distance-SIPM_size))){return false;};
 
-    double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
-    if(abs(r-Radius)>1e-6){return false;};
+  double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
+  if(abs(r-Radius)>1e-6){return false;};
 
-    double theta = atan(cpoint[1]/cpoint[0])/SIPM_angle;
-    double delta = theta - round(theta);
-    if(abs(delta) > SIPM_alpha){return false;};
+  double theta = atan(cpoint[1]/cpoint[0])/SIPM_angle;
+  double delta = theta - round(theta);
+  if(abs(delta) > SIPM_alpha){return false;};
 
-    return true;
+  return true;
+}
+
+bool Tracker::Is_Detector_Region()
+{
+  //Check if the photon is in the right z range
+  double h = abs(cpoint[2]);
+  if(h>(0.5*(Height+Distance+SIPM_size)) || h<(0.5*(Height+Distance-SIPM_size))){return false;};
+
+  //Check if the photon is in the scintillator boundary
+  double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
+  if(abs(r-Radius)>1e-6){return false;};
+
+  //Current phi angle of the photon
+  double phi = tools::PhiAngle(cpoint);
+  
+  //Check if the photon is in the phi angular range of any SIPM
+  for(double SIPM_phi : SIPM_angles){
+    if(abs(phi - SIPM_phi) < SIPM_phi_range/2){
+      return true;
+    }
+  }
+
+  return false;
 }
 
 ////////////////////////////////////// Bethe Bloch function to calculate energy loss in material //////////////////////////////////
@@ -490,3 +608,11 @@ double Tracker::BetheBloch(double v){
     return ((qe*qe*qe*qe*n_density*Z*Z*(log((2*me*c*c*v*v)/(I*(1-v*v)))-v*v))/(4*M_PI*eps0*eps0*me*c*c*v*v))/(1.602e-13);
 }
 
+//Deletes the muon and all the photons, resets the counters and flags and clears all tracks from the geometry
+/*void Tracker::Reset(){
+  
+#ifdef DRAWMODE
+  //geom->ClearTracks();
+  main_track->ResetTrack();
+#endif
+}*/

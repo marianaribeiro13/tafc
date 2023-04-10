@@ -20,7 +20,7 @@ int main(int argc, char* argv[]){
     double step = 0.001;
     int n_SIPMS = 4;
     double SIPM_size = .6;
-    int N_muons = 20;
+    int N_muons = 8;
     
     Geometry World; //Instantiate geometry object - create pointer to geometry
 
@@ -39,16 +39,23 @@ int main(int argc, char* argv[]){
         //Create Tracker object
         Tracker Simulation(geom, gen, Muon, step, radius, height, distance, airgap, althickness, n_SIPMS, SIPM_size);
 
-        //Propagate muon and correspondent photons
         Simulation.Propagate_Muon();
-        Simulation.Propagate_Photons(Simulation.GetN_photons());
 
-        std::cout << '\n' << "Total Photons Generated: " << Simulation.GetN_photons() << '\n';
+        //Propagate muon and correspondent photons
+        if(Simulation.GetDoubleCross()){
+            Simulation.Propagate_Photons(Simulation.GetN_photons());
+        } else {
+            N_muons++; //The muon was not accepted - propagate one more
+        }
+
+        /*std::cout << '\n' << "Total Photons Generated: " << Simulation.GetN_photons() << '\n';
         std::cout << "Photons Absorbed: " << Simulation.GetN_absorbed() << '\n';
         std::cout << "Photons Detected: " << Simulation.GetN_detected() << '\n';
-        std::cout << "Photons Lost: " << Simulation.GetN_lost() << '\n';
+        std::cout << "Photons Lost: " << Simulation.GetN_lost() << '\n';*/
 
     }
+
+    delete gen;
 
     auto end = std::chrono::high_resolution_clock::now(); //Program end time
     std::chrono::duration<float> duration = end - start;

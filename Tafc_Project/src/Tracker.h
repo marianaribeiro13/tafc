@@ -19,8 +19,8 @@ class Tracker
 public:
 
   /////////// Constructor and Destructor //////////////////
-  Tracker(TGeoManager* geom, Generator* gen, Particle* part, double step, double radius, double height, double distance, 
-  double airgap, double althickness, int n_SIPMS, double s_size);
+  Tracker(TGeoManager* GeoM, Generator* gen, Particle* part, double step, double radius, double height, double distance, 
+  double airgap, double althickness, int n_SIPMS, double s_size, std::vector <double> s_angles);
   ~Tracker();
 
   //////////////Geometry check///////////
@@ -33,6 +33,7 @@ public:
   bool VacuumToPlastic(double);
   bool VacuumToAluminium(double);
   bool DetectionCheck(double);
+  bool Is_Photon_Detected(double E);
 
   /////Muon Propagators/////
   void Propagate_Muon();
@@ -42,7 +43,7 @@ public:
 
   /////Photon Propagators/////
   void Propagate_Photons(int n);
-  //void InitializePhotonTrack(int);
+  void InitializePhotonTrack(int);
   //void Photon_Scintillator_Step(int); //Removed
   void Photon_Scintillator_Reflection_Check(int);
   // void Photon_Absorbtion(int,double); //Removed
@@ -63,12 +64,17 @@ public:
   double CheckDensity(); //Move to Geometry
 	double GetRefractiveIndex(); // Move to Geometry
 	bool Check_Symmetric_Detector();
+  bool Is_Detector_Region();
 
   double BetheBloch(double v);
 
+  //void Reset();
+
 private:
 
+  TGeoManager* geom;
   TGeoNavigator* nav;
+  TVirtualGeoTrack* main_track;
   double stepvalue; //defined arbitrary step
   Generator* generator; //pointer to generator object (generates random variables)
   Particle* Muon;
@@ -80,7 +86,8 @@ private:
   int N_absorbed; //number of absorbed photons in the scintillator
   int N_detected; //number of detected photons (using SIPMS)
   int N_lost; //number of photons absorbed in the aluminium
-  bool DoubleCross;
+  bool DoubleCross; // This Flag Checks if the photons have been propagated or not
+  bool Photons_flag; //This Flag Checks if the muon has crossed both scintillators
 
   double Radius;
 	double Height;
@@ -93,6 +100,8 @@ private:
 	double SIPM_size;
 	double SIPM_angle;
 	double SIPM_alpha;
+  double SIPM_phi_range; //Approximate SIPM phi range (assumes SIPM size much smaller than scintillator radius)
+  std::vector <double> SIPM_angles; //Position in phi of all SIPMs
 
 };
 

@@ -86,7 +86,7 @@ vector<double> Generator::Generate_Position(double d,double h,double R){
 
 
   vector<double> aux(3);
-  aux[2] = d/2+h-1e-12;
+  aux[2] = d/2+h-1e-12; // The 1e-12 ensures the particle starting position is inside the scintillator (no extra step to cross the incident plane is needed)
   double r = Random->Uniform(0,R);
   double theta = Random->Uniform(0,2*M_PI);
   aux[0] = r * cos(theta);
