@@ -102,13 +102,14 @@ int main(int argc, char* argv[]){
     }
 
 
-    TFile* outfile = new TFile("~/Tafc_Project/ProjectResults.root","UPDATE","Project_Results");
+    TFile* outfile = new TFile("~/Tafc_Project/ProjectResults.root","UPDATE","ProjectResults");
     TTree *tree;
 
     ////////////////////////////////////////// DISK EFFICIENCY MODE ////////////////////////////////////////////////////
 
     if(argc == 2 && !strcmp(argv[1],"-Disk"))
     {
+
       double initial_x_muon = 0.;
       double initial_y_muon = 0.;
       double detector_efficiency = 0.;
@@ -119,12 +120,17 @@ int main(int argc, char* argv[]){
         tree->Branch("initial_x_muon",&initial_x_muon,"initial_x_muon/D");
         tree->Branch("initial_y_muon",&initial_y_muon,"initial_y_muon/D");
         tree->Branch("detector_efficiency",&detector_efficiency,"detector_efficiency/D");
+        
+        std::cout << "DiskEfficiency TTree created \n\n";
       } else {
         tree = (TTree*)outfile->Get("DiskEfficiency");
 
         tree->SetBranchAddress("initial_x_muon",&initial_x_muon);
         tree->SetBranchAddress("initial_y_muon",&initial_y_muon);
         tree->SetBranchAddress("detector_efficiency",&detector_efficiency);
+        outfile->Delete("DiskEfficiency;1");
+
+        std::cout << "DiskEfficiency TTree updated \n\n";
       }
 
       for (int i = 0; i < param.N_threads; i++) {
@@ -137,13 +143,9 @@ int main(int argc, char* argv[]){
         navigator.join();
       }
 
-      tree->Fill();
-      //tree->ResetBranchAddresses();
-      //tree->Write();
       outfile->Write();
       outfile->Close();
 
-      std::cout << "DiskEfficiency.root file with TTree created \n\n";
     }
 
 
@@ -151,6 +153,8 @@ int main(int argc, char* argv[]){
 
     if(argc == 2 && !strcmp(argv[1],"-Geo"))
     {
+      //TFile* outfile = new TFile("~/Tafc_Project/GeomEfficiency.root","UPDATE","GeomEfficiency");
+      //TTree *tree;
 
       if(!(outfile->FindKey("GeomEfficiency"))){
         tree = new TTree("GeomEfficiency","GeomEfficiency");
@@ -158,12 +162,17 @@ int main(int argc, char* argv[]){
         tree->Branch("distance",&param.Distance,"distance/D");
         tree->Branch("Nmuons_total",&Nmuons_total,"Nmuons_total/I");
         tree->Branch("Nmuons_accepted",&param.Nmuons_accepted,"Nmuons_accepted/I");
+
+        std::cout << "GeomEfficiency TTree created \n\n";
       } else {
         tree = (TTree*)outfile->Get("GeomEfficiency");
 
         tree->SetBranchAddress("distance",&param.Distance);
         tree->SetBranchAddress("Nmuons_total",&Nmuons_total);
         tree->SetBranchAddress("Nmuons_accepted",&param.Nmuons_accepted);
+        outfile->Delete("GeomEfficiency;1");
+
+        std::cout << "GeomEfficiency TTree updated \n\n";
       }
 
       for (int i = 0; i < param.N_threads; i++){
@@ -176,8 +185,6 @@ int main(int argc, char* argv[]){
       }
 
       tree->Fill();
-      //tree->ResetBranchAddresses();
-      //tree->Write();
       outfile->Write();
       outfile->Close();
 

@@ -33,7 +33,7 @@ int& Nmuons_total, int& Nphotons_total, int& Nphotons_detected, int& Nphotons_ab
 
     //Check if the muon crossed both scintillators (If it did propagate photons)
     if(Simulation.GetDoubleCross()){
-      Simulation.Propagate_Photons(Simulation.GetN_photons());
+      Simulation.Propagate_Photons(0,Simulation.GetN_photons());
     
       Nphotons_total_thisthread += Simulation.GetN_photons();
       Nphotons_detected_thisthread += Simulation.GetN_detected();
@@ -83,12 +83,16 @@ void Draw_Mode(TGeoManager* geom, int seed, int N_photons_draw)
 
     //Check if the muon crossed both scintillators (If it did propagate photons)
     if(Simulation.GetDoubleCross()){
-      Simulation.Propagate_Photons(N_photons_draw);
+      int m = Simulation.GetN_photons()/N_photons_draw;
+      for(int k=0; k<N_photons_draw; k++){
+        int i=m*k;
+        Simulation.Propagate_Photons(i,i+1);
+      }
     } else {
       N_muons++; //The muon was not accepted - propagate one more
     }
   }
-  
+
   delete gen;
 }
 
@@ -115,15 +119,15 @@ void DiskEfficiency_Mode(TGeoManager* geom, int seed, double& initial_x_muon,
 
     //Check if the muon crossed both scintillators (If it did propagate photons)
     if(Simulation.GetDoubleCross()){
-      Simulation.Propagate_Photons(Simulation.GetN_photons());
+      Simulation.Propagate_Photons(0,Simulation.GetN_photons1());
       
       mu.lock();
-      detector_efficiency = Simulation.GetN_detected()/Simulation.GetN_photons();
+      detector_efficiency = (double)Simulation.GetN_detected()/Simulation.GetN_photons1();
       initial_x_muon = Muon->GetStartingPosition()[0];
       initial_y_muon = Muon->GetStartingPosition()[1];
       tree->Fill();
       mu.unlock();
-      
+
     } else {
       N_muons++; //The muon was not accepted - propagate one more
     }

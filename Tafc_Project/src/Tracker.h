@@ -42,7 +42,7 @@ public:
   void Muon_Aluminium_Step();
 
   /////Photon Propagators/////
-  void Propagate_Photons(int n);
+  void Propagate_Photons(int iphoton, int fphoton);
   void InitializePhotonTrack(int);
   //void Photon_Scintillator_Step(int); //Removed
   void Photon_Scintillator_Reflection_Check(int);

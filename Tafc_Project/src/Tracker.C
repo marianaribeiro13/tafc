@@ -245,9 +245,9 @@ void Tracker::Propagate_Muon()
     {
       scintillator_cross++; //Plus one scintillator crossed
       Muon_Scintillator_Step();
-      /*if(scintillator_cross == 1){
+      if(scintillator_cross == 1){
         N_photons1 = N_photons;
-      }*/
+      }
     }
     if(CheckDensity()==2.7) //Particle is in the aluminium foil
     {
@@ -353,14 +353,14 @@ void Tracker::Muon_Aluminium_Step()
 //////////Photon Propagators//////////
 //////////Photon Propagators//////////
 
-void Tracker::Propagate_Photons(int n)
+void Tracker::Propagate_Photons(int iphoton, int fphoton)
 {
   Photons_flag = true;
 
-  int m = N_photons/n;
-  for(int j=0;j<n;j++)
+  //int m = N_photons/n;
+  for(int i=iphoton; i<fphoton;i++)
   {
-    int i=m*j;
+    //int i=m*j;
     nav->InitTrack(Photons[i]->GetStartingPosition().data(), Photons[i]->GetDirection().data());
 #ifdef DRAWMODE
     //Mutex.lock();
