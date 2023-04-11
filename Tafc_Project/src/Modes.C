@@ -3,8 +3,7 @@
 
 std::mutex mu;
 
-void Modes::Simulation_Mode(TGeoManager* geom, double step, double radius, double height, double distance, 
-double airgap, double althickness, int n_SIPMS, double SIPM_size, std::vector<double> SIPM_angles, int seed, int N_muons,
+void Simulation_Mode(TGeoManager* geom, int seed,
 int& Nmuons_total, int& Nphotons_total, int& Nphotons_detected, int& Nphotons_absorbed, int& Nphotons_lost)
 {
   std::thread::id this_id = std::this_thread::get_id(); //Thread id
@@ -17,21 +16,25 @@ int& Nmuons_total, int& Nphotons_total, int& Nphotons_detected, int& Nphotons_ab
 
   Generator* gen = new Generator(seed); // I think this should be inside lock but it is working fine
 
+  Parameters param;
+
+  int N_muons = param.Nmuons_accepted;
+
   for(int j = 0; j < N_muons; j++){
 
     //Generate random muon in the scintillator incident plane to add to the simulation
-    Particle* Muon = gen->Generate_CosmicMuon(gen->Generate_Position(distance, height, radius));
+    Particle* Muon = gen->Generate_CosmicMuon(gen->Generate_Position(param.Distance, param.Height, param.Radius));
 
     //Create Tracker object
-    Tracker Simulation(geom, gen, Muon, step, radius, height, distance, airgap, althickness, n_SIPMS, SIPM_size, SIPM_angles);
+    Tracker Simulation(geom, gen, Muon);
 
     //Propagate muon and create emited photons
     Simulation.Propagate_Muon();
 
     //Check if the muon crossed both scintillators (If it did propagate photons)
     if(Simulation.GetDoubleCross()){
-      //Simulation.Propagate_Photons(Simulation.GetN_photons());
-      //Simulation.Propagate_Photons(2);
+      Simulation.Propagate_Photons(Simulation.GetN_photons());
+    
       Nphotons_total_thisthread += Simulation.GetN_photons();
       Nphotons_detected_thisthread += Simulation.GetN_detected();
       Nphotons_absorbed_thisthread += Simulation.GetN_absorbed();
@@ -58,20 +61,22 @@ int& Nmuons_total, int& Nphotons_total, int& Nphotons_detected, int& Nphotons_ab
 
 
 
-void Modes::Draw_Mode(TGeoManager* geom, double step, double radius, double height, double distance, 
-double airgap, double althickness, int n_SIPMS, double SIPM_size, std::vector<double> SIPM_angles, int seed, int N_muons, int N_photons_draw)
+void Draw_Mode(TGeoManager* geom, int seed, int N_photons_draw)
 {
   std::thread::id this_id = std::this_thread::get_id(); //Thread id
 
   Generator* gen = new Generator(seed); // I think this should be inside lock but it is working fine
 
+  Parameters param;
+  int N_muons = param.Nmuons_accepted;
+
   for(int j = 0; j < N_muons; j++){
 
     //Generate random muon in the scintillator incident plane to add to the simulation
-    Particle* Muon = gen->Generate_CosmicMuon(gen->Generate_Position(distance, height, radius));
+    Particle* Muon = gen->Generate_CosmicMuon(gen->Generate_Position(param.Distance, param.Height, param.Radius));
 
     //Create Tracker object
-    Tracker Simulation(geom, gen, Muon, step, radius, height, distance, airgap, althickness, n_SIPMS, SIPM_size, SIPM_angles);
+    Tracker Simulation(geom, gen, Muon);
 
     //Propagate muon and create emited photons
     Simulation.Propagate_Muon();
@@ -87,23 +92,25 @@ double airgap, double althickness, int n_SIPMS, double SIPM_size, std::vector<do
   delete gen;
 }
 
-void Modes::DiskEfficiency_Mode(TGeoManager* geom, double step, double radius, double height, double distance, 
-double airgap, double althickness, int n_SIPMS, double SIPM_size, std::vector<double> SIPM_angles, int seed, int N_muons, 
-double& initial_x_muon, double& initial_y_muon, double& detector_efficiency, TTree* tree){
+void DiskEfficiency_Mode(TGeoManager* geom, int seed, double& initial_x_muon, 
+                          double& initial_y_muon, double& detector_efficiency, TTree* tree){
 
   std::thread::id this_id = std::this_thread::get_id(); //Thread id
 
   Generator* gen = new Generator(seed); // I think this should be inside lock but it is working fine
 
+  Parameters param;
+  int N_muons = param.Nmuons_accepted;
+
   for(int j = 0; j < N_muons; j++){
 
     //Generate random muon in the scintillator incident plane to add to the simulation
-    Particle* Muon = gen->Generate_CosmicMuon(gen->Generate_Position(distance, height, radius));
+    Particle* Muon = gen->Generate_CosmicMuon(gen->Generate_Position(param.Distance, param.Height, param.Radius));
     initial_x_muon = Muon->GetStartingPosition()[0];
     initial_y_muon = Muon->GetStartingPosition()[1];
 
     //Create Tracker object
-    Tracker Simulation(geom, gen, Muon, step, radius, height, distance, airgap, althickness, n_SIPMS, SIPM_size, SIPM_angles);
+    Tracker Simulation(geom, gen, Muon);
 
     //Propagate muon and create emited photons
     Simulation.Propagate_Muon();
@@ -111,11 +118,12 @@ double& initial_x_muon, double& initial_y_muon, double& detector_efficiency, TTr
     //Check if the muon crossed both scintillators (If it did propagate photons)
     if(Simulation.GetDoubleCross()){
       Simulation.Propagate_Photons(Simulation.GetN_photons());
-      
+      detector_efficiency = Simulation.GetN_detected()/Simulation.GetN_photons();
+      tree->Fill();
+
     } else {
       N_muons++; //The muon was not accepted - propagate one more
     }
-
 
   }
   
@@ -124,32 +132,26 @@ double& initial_x_muon, double& initial_y_muon, double& detector_efficiency, TTr
   //Locked stuff happens one thread at a time
   mu.lock();
   std::cout << "thread " << this_id << "\n\n"; //Print thread id
-  //std::cout << "\n\n" << "ThreadID: " << Simulation.GetNavigator()->GetThreadId();
-  Nmuons_total += N_muons;
-  Nphotons_total += Nphotons_total_thisthread;
-  Nphotons_detected += Nphotons_detected_thisthread;
-  Nphotons_absorbed += Nphotons_absorbed_thisthread;
-  Nphotons_lost += Nphotons_lost_thisthread;
   mu.unlock();
-
-
 }
 
-void Modes::GeomEfficiency_Mode(TGeoManager* geom, double step, double radius, double height, double distance, 
-double airgap, double althickness, int n_SIPMS, double SIPM_size, std::vector<double> SIPM_angles, int seed, int N_muons,
-int& Nmuons_total)
+
+void GeomEfficiency_Mode(TGeoManager* geom, int seed, int& Nmuons_total)
 {
   std::thread::id this_id = std::this_thread::get_id(); //Thread id
 
   Generator* gen = new Generator(seed); // I think this should be inside lock but it is working fine
 
+  Parameters param;
+  int N_muons = param.Nmuons_accepted;
+
   for(int j = 0; j < N_muons; j++){
 
     //Generate random muon in the scintillator incident plane to add to the simulation
-    Particle* Muon = gen->Generate_CosmicMuon(gen->Generate_Position(distance, height, radius));
+    Particle* Muon = gen->Generate_CosmicMuon(gen->Generate_Position(param.Distance, param.Height, param.Radius));
 
     //Create Tracker object
-    Tracker Simulation(geom, gen, Muon, step, radius, height, distance, airgap, althickness, n_SIPMS, SIPM_size, SIPM_angles);
+    Tracker Simulation(geom, gen, Muon);
 
     //Propagate muon and create emited photons
     Simulation.Propagate_Muon();

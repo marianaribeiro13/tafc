@@ -14,30 +14,12 @@
 int main(int argc, char* argv[]){
   
     auto start = std::chrono::high_resolution_clock::now(); //Program start time
+    
+    int t = time(0);
 
     //unsigned int nthreads = std::thread::hardware_concurrency();
     //std::cout << "Available number of threads: " << nthreads << '\n';
-
-    //////////////// PARAMETERS (all distances in centimeters) ////////////////////////
-    
-    double radius = 5.0; //Scintillator radius
-    double height = 1.0; //Scintillator height
-    double distance = 25.; //Distance between the two scintillators
-    double airgap = .1; //Air gap thickness between the scintillator and the aluminium foil
-    double althickness = 0.0016; //Aluminium foil thickness
-    int n_SIPMS = 4; //Number of SIPMS per scintillator (not being used now)
-    double SIPM_size = .6; //SIPM_size (the detector area is SIPM_size*SIPM_size)
-
-    //Phi angle of each SIPM placed on center of lateral scintillator wall (size of the vector is the number of SIPMs per scintillator)
-    std::vector<double> SIPM_angles {0., M_PI/2, M_PI, 3*M_PI/2};
-    
-    double step = 0.001; //Defined step for muon propagation (Energy loss in the scintillator is calculated for each step)
-    
-    int Nmuons_accepted = 16; // Number of muons to propagate (they have to cross both detectors)
-    int N_threads = 8; // Number of threads
-
-    ///////////////////////////////////////////////////////////////////////////////////
-   
+  
     //Initialize variables
     int Nmuons_total = 0; // Total number of generated muons
     int Nphotons_total = 0; // Total number of photons (only for accepted muons)
@@ -46,23 +28,27 @@ int main(int argc, char* argv[]){
     int Nphotons_lost = 0; // Number of photons lost in the aluminium
 
     std::vector<std::thread> threads; //vector of threads (each thread has one TGeoNavigator)
-    int muons_per_thread = Nmuons_accepted/N_threads; // Number of accepted muons to propagate on each thread
 
     Geometry World; //Instantiate geometry object - create pointer to geometry
 
+    Parameters param;
+
     //Create Muon Telescope
-    World.Build_MuonTelescope(radius, height, distance, airgap, althickness);
+    World.Build_MuonTelescope(param.Radius, param.Height, param.Distance, param.Airgap, param.Thickness);
 
     TGeoManager* geom = World.GetGeoManager(); //Get pointer to telescope geometry
     
-    geom->SetMaxThreads(N_threads); //Set maximum number of threads and creates thread private data for all geometry objects.
+    geom->SetMaxThreads(param.N_threads); //Set maximum number of threads and creates thread private data for all geometry objects.
+    
+
+    ////////////////////////////////////////// SIMULATION MODE ////////////////////////////////////////////////////
     
     if(argc == 1){
       //Start propagation in the threads
-      for (int i = 0; i < N_threads; i++) {
-        threads.emplace_back(std::thread(&Modes::Simulation_Mode, geom, step, radius, height, distance, airgap, 
-        althickness, n_SIPMS, SIPM_size, SIPM_angles, i, muons_per_thread,
-        std::ref(Nmuons_total), std::ref(Nphotons_total), std::ref(Nphotons_detected), std::ref(Nphotons_absorbed), std::ref(Nphotons_lost)));
+      for (int i = 0; i < param.N_threads; i++) {
+        threads.emplace_back(std::thread(Simulation_Mode, geom, t+i, std::ref(Nmuons_total),
+                                          std::ref(Nphotons_total), std::ref(Nphotons_detected), 
+                                          std::ref(Nphotons_absorbed), std::ref(Nphotons_lost)));
       }
 
       //Join threads (wait for all threads to finish before continuing)
@@ -74,8 +60,8 @@ int main(int argc, char* argv[]){
 
       std::cout << "\n\n\n" << "//////////////////////// FINAL RESULTS ////////////////////////" << "\n\n";
       std::cout << "Total Muons Generated: " << Nmuons_total << '\n';
-      std::cout << "Total Muons Accepted (Cross both scintillators): " << Nmuons_accepted << '\n';
-      std::cout << "Geometrical acceptance: " << 100*(double)Nmuons_accepted/Nmuons_total << "% \n\n";
+      std::cout << "Total Muons Accepted (Cross both scintillators): " << param.Nmuons_accepted << '\n';
+      std::cout << "Geometrical acceptance: " << 100*(double)param.Nmuons_accepted/Nmuons_total << "% \n\n";
       std::cout << "Total Photons Generated: " << Nphotons_total << '\n';
       std::cout << "Photons Detected: " << Nphotons_detected << '\n';
       std::cout << "Photons Absorbed: " << Nphotons_absorbed << '\n';
@@ -83,15 +69,17 @@ int main(int argc, char* argv[]){
       std::cout << "Photon Detection efficiency: " << 100*(double)Nphotons_detected/Nphotons_total << "% \n\n";
     }
 
+
+    ////////////////////////////////////////// DRAW MODE ////////////////////////////////////////////////////
+    
     if(argc == 3 && !strcmp(argv[1],"-draw"))
     {
 
       int N_photons_draw = 0; //Variable that will store the number of photons drawn per muon
       if(sscanf(argv[2],"%d",&N_photons_draw)){
         //Start propagation in the threads
-        for (int i = 0; i < N_threads; i++) {
-          threads.emplace_back(std::thread(&Modes::Draw_Mode, geom, step, radius, height, distance, airgap, 
-          althickness, n_SIPMS, SIPM_size, SIPM_angles, i, muons_per_thread, N_photons_draw));
+        for (int i = 0; i < param.N_threads; i++) {
+          threads.emplace_back(std::thread(Draw_Mode, geom, t+i, N_photons_draw));
         }
 
         //Join threads (wait for all threads to finish before continuing)
@@ -113,14 +101,17 @@ int main(int argc, char* argv[]){
       }
     }
 
+
+    TFile* outfile = new TFile("~/Tafc_Project/ProjectResults.root","UPDATE","Project_Results");
+    TTree *tree;
+
+    ////////////////////////////////////////// DISK EFFICIENCY MODE ////////////////////////////////////////////////////
+
     if(argc == 2 && !strcmp(argv[1],"-Disk"))
     {
       double initial_x_muon = 0.;
       double initial_y_muon = 0.;
       double detector_efficiency = 0.;
-
-      TFile* outfile = new TFile("~/Tafc_Project/DiskEfficiency.root","UPDATE","GeomEfficiency");
-      TTree *tree;
 
       if(!(outfile->FindKey("DiskEfficiency"))){
         tree = new TTree("DiskEfficiency","DiskEfficiency");
@@ -136,10 +127,9 @@ int main(int argc, char* argv[]){
         tree->SetBranchAddress("detector_efficiency",&detector_efficiency);
       }
 
-      for (int i = 0; i < N_threads; i++) {
-        threads.emplace_back(std::thread(&Modes::DiskEfficiency_Mode, geom, step, radius, height, distance, airgap, 
-        althickness, n_SIPMS, SIPM_size, SIPM_angles, i, muons_per_thread,
-        std::ref(initial_x_muon),std::ref(initial_y_muon), std::ref(detector_efficiency), TTree* tree));
+      for (int i = 0; i < param.N_threads; i++) {
+        threads.emplace_back(std::thread(DiskEfficiency_Mode, geom, t+i, std::ref(initial_x_muon),
+                              std::ref(initial_y_muon), std::ref(detector_efficiency), TTree* tree));
       }
 
       //Join threads (wait for all threads to finish before continuing)
@@ -156,11 +146,11 @@ int main(int argc, char* argv[]){
       std::cout << "DiskEfficiency.root file with TTree created \n\n";
     }
 
+
+    ////////////////////////////////////////// GEOMETRY ACCEPTANCE EFFICIENCY MODE ////////////////////////////////////////////////////
+
     if(argc == 2 && !strcmp(argv[1],"-Geo"))
     {
-
-      TFile* outfile = new TFile("~/Tafc_Project/GeomEfficiency.root","UPDATE","GeomEfficiency");
-      TTree *tree;
 
       if(!(outfile->FindKey("GeomEfficiency"))){
         tree = new TTree("GeomEfficiency","GeomEfficiency");
@@ -176,10 +166,8 @@ int main(int argc, char* argv[]){
         tree->SetBranchAddress("Nmuons_accepted",&Nmuons_accepted);
       }
 
-      for (int i = 0; i < N_threads; i++) {
-        threads.emplace_back(std::thread(&Modes::GeomEfficiency_Mode, geom, step, radius, height, distance, airgap, 
-        althickness, n_SIPMS, SIPM_size, SIPM_angles, i, muons_per_thread,
-        std::ref(Nmuons_total)));
+      for (int i = 0; i < param.N_threads; i++){
+        threads.emplace_back(std::thread(GeomEfficiency_Mode, geom, t+i, std::ref(Nmuons_total)));
       }
 
       //Join threads (wait for all threads to finish before continuing)
@@ -200,8 +188,9 @@ int main(int argc, char* argv[]){
       std::cout << "Total Muons Accepted (Cross both scintillators): " << Nmuons_accepted << '\n';
       std::cout << "Geometrical acceptance: " << 100*(double)Nmuons_accepted/Nmuons_total << "% \n\n";
 
-      std::cout << "GeomEfficiency.root file with TTree created \n\n";
+      std::cout << "GeomEfficiency TTree added to ProjectResults.root \n\n";
     }
+
 
     auto end = std::chrono::high_resolution_clock::now(); //Program end time
     std::chrono::duration<float> duration = end - start; //Program duration

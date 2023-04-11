@@ -12,6 +12,7 @@
 #include "TCanvas.h"
 #include <cmath>
 #include "TH2.h"
+#include "Parameters.h"
 using namespace std;
 
 class Tracker
@@ -19,8 +20,7 @@ class Tracker
 public:
 
   /////////// Constructor and Destructor //////////////////
-  Tracker(TGeoManager* GeoM, Generator* gen, Particle* part, double step, double radius, double height, double distance, 
-  double airgap, double althickness, int n_SIPMS, double s_size, std::vector <double> s_angles);
+  Tracker(TGeoManager* GeoM, Generator* gen, Particle* part);
   ~Tracker();
 
   //////////////Geometry check///////////
@@ -54,6 +54,7 @@ public:
 
   //Data getters
   int GetN_photons(){return N_photons;};
+  int GetN_photons1(){return N_photons1;};
   int GetN_absorbed(){return N_absorbed;};
   int GetN_detected(){return N_detected;};
   int GetN_lost(){return N_lost;};
@@ -83,28 +84,16 @@ private:
   const double *cdir; // pointer to current position (fCurrentDir of TGeoNavigator)
 
   int N_photons; //number of emitted photons
+  int N_photons1; //number of photons 
   int N_absorbed; //number of absorbed photons in the scintillator
   int N_detected; //number of detected photons (using SIPMS)
-  int N_detected1; //number of detected photons in the first scintillator
-  int N_detected2; //number of detected photons in the second scintillator
+  //int N_detected1; //number of detected photons in the first scintillator
+  //int N_detected2; //number of detected photons in the second scintillator
   int N_lost; //number of photons absorbed in the aluminium
   bool DoubleCross; // This Flag Checks if the photons have been propagated or not
   bool Photons_flag; //This Flag Checks if the muon has crossed both scintillators
 
-  double Radius;
-	double Height;
-	double Distance;
-	double innerradius;
-	double outerradius;
-	double Thickness;
-	double Airgap;
-	int n_SIPM;
-	double SIPM_size;
-	double SIPM_angle;
-	double SIPM_alpha;
-  double SIPM_phi_range; //Approximate SIPM phi range (assumes SIPM size much smaller than scintillator radius)
-  std::vector <double> SIPM_angles; //Position in phi of all SIPMs
-
+  Parameters param;
 };
 
 #endif

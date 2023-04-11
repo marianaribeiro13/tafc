@@ -12,10 +12,8 @@
 #include <string>
 #include <sstream>
 #include <thread>
+#include "TTree.h"
 
-class Modes{
-public:
-    Modes() = default;
     //void Heatmap_Mode(Tracker*,DataManager*);
     //void HeatmapSingle_Mode(Tracker*,DataManager*);
     //void GeomEfficiency_Mode(Tracker*,DataManager*);
@@ -23,22 +21,15 @@ public:
     //void Draw_Mode(Tracker*, int Nphotons);
     //void Simulation_Mode(Tracker*);
 
-    static void Simulation_Mode(TGeoManager* geom, double step, double radius, double height, double distance, 
-                            double airgap, double althickness, int n_SIPMS, double SIPM_size, std::vector<double> SIPM_angles, int seed, int N_muons,
-                            int& Nmuons_total, int& Nphotons_total, int& Nphotons_detected, int& Nphotons_absorbed, int& Nphotons_lost);
+void Simulation_Mode(TGeoManager* geom, int seed, int& Nmuons_total, int& Nphotons_total, 
+                     int& Nphotons_detected, int& Nphotons_absorbed, int& Nphotons_lost);
 
-    static void Draw_Mode(TGeoManager* geom, double step, double radius, double height, double distance, 
-                            double airgap, double althickness, int n_SIPMS, double SIPM_size, std::vector<double> SIPM_angles, 
-                            int seed, int N_muons, int N_photons_draw);
+void Draw_Mode(TGeoManager* geom, int seed, int N_photons_draw);
 
-    static void DiskEfficiency_Mode(TGeoManager* geom, double step, double radius, double height, double distance, 
-                            double airgap, double althickness, int n_SIPMS, double SIPM_size, std::vector<double> SIPM_angles, int seed, int N_muons, 
-                            double& initial_x_muon, double& initial_y_muon, double& detector_efficiency, TTree* tree){
+void DiskEfficiency_Mode(TGeoManager* geom, int seed, double& initial_x_muon, 
+                         double& initial_y_muon, double& detector_efficiency, TTree* tree);
 
-    static void GeomEfficiency_Mode(TGeoManager* geom, double step, double radius, double height, double distance, 
-                            double airgap, double althickness, int n_SIPMS, double SIPM_size, std::vector<double> SIPM_angles, int seed, int N_muons,
-                            int& Nmuons_total);
-    ~Modes() = default;
-};
+void GeomEfficiency_Mode(TGeoManager* geom, int seed, int& Nmuons_total);
+    
 
 #endif

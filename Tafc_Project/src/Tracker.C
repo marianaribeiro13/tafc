@@ -8,26 +8,10 @@ std::mutex Mutex;
 #endif 
 ///////////////////////////// Constructer //////////////////////////////
 
-Tracker::Tracker(TGeoManager* GeoM, Generator* g, Particle* part, double step, double radius, double height, double distance, double airgap, double althickness, int n_SIPMS,double s_size, std::vector <double> s_angles)
-: stepvalue(step), N_photons(0),N_absorbed(0),N_detected(0),N_lost(0),DoubleCross(false)
+Tracker::Tracker(TGeoManager* GeoM, Generator* g, Particle* part)
+: N_photons(0), N_absorbed(0),N_detected(0), N_photons1(0), N_lost(0), DoubleCross(false)
 {
-  //TObjArray* list = geom->GetListOfGVolumes();
-  //Radius = list->FindObject("scintillator")->GetRMax();
-  Radius = radius; 
-  Height = height;
-  Distance = distance;
-
-  innerradius = radius + airgap;
-  outerradius = radius +airgap+althickness;
-  Airgap = airgap;
-  Thickness = althickness;
-
-  n_SIPM = n_SIPMS;
-  SIPM_size = s_size;
-  SIPM_angle = 2*M_PI / n_SIPM;
-  SIPM_alpha = 0.5*SIPM_size/(SIPM_angle*Radius);
-  SIPM_phi_range = SIPM_size/Radius;
-  SIPM_angles = s_angles;
+  stepvalue = param.step;
 
   geom = GeoM; //Assign pointer to TGeoManager object
   generator = g; //Assign pointer to Generator object
@@ -158,7 +142,7 @@ vector<double> Tracker::GetNormal()
   //vector<double> d = {cdir[0], cdir[1], cdir[2]};
   vector<double> d = {nav->GetCurrentDirection()[0],nav->GetCurrentDirection()[1],nav->GetCurrentDirection()[2]};
 
-  if(abs(r-Radius) <1e-6 || abs(r-innerradius) <1e-6 || abs(r-outerradius) <1e-6)
+  if(abs(r-param.Radius) <1e-6 || abs(r-param.innerradius) <1e-6 || abs(r-param.outerradius) <1e-6)
   {
 
     vertical_reflection=true;
@@ -166,7 +150,7 @@ vector<double> Tracker::GetNormal()
     aux[1] = cpoint[1]/r;
     aux[2] = 0;
   }
-  if((abs(h-(0.5*Distance+Height))<1e-6) || (abs(h-0.5*Distance)<1e-6) || (abs(h-(Airgap+(0.5*Distance)+Height))<1e-6)  || (abs(h-(-Airgap+(0.5*Distance)))<1e-6) || (abs(h-(Thickness+Airgap+(0.5*Distance)+Height))<1e-6) || (abs(h-(-Thickness-Airgap+(0.5*Distance)))<1e-6)  )
+  if((abs(h-(0.5*param.Distance+param.Height))<1e-6) || (abs(h-0.5*param.Distance)<1e-6) || (abs(h-(param.Airgap+(0.5*param.Distance)+param.Height))<1e-6)  || (abs(h-(-param.Airgap+(0.5*param.Distance)))<1e-6) || (abs(h-(param.Thickness+param.Airgap+(0.5*param.Distance)+param.Height))<1e-6) || (abs(h-(-param.Thickness-param.Airgap+(0.5*param.Distance)))<1e-6) )
   {
     horizontal_reflection =true;
     aux[0] = 0;
@@ -189,23 +173,23 @@ vector<double> Tracker::GetNormal()
 //Check if the particle is in vacuum near the scintillator boundary
 bool Tracker::VacuumToPlastic(double r)
 {
-  //If the particle is in vacuum (in the air gap) and near the lateral scintillator boundary 
+  double h = abs(abs(cpoint[2])-0.5*(param.Distance+param.Height));
+  //If the particle is in vacuum (in the air gap) and near the lateral scintillator boundary
   //or near one of the flat scintillator boundaries
-  if(CheckDensity()==0 && ((abs(r-Radius) < 1e-6) || (abs(abs(cpoint[2])-(0.5*Distance+Height))<1e-6) 
-  || (abs(abs(cpoint[2])-(0.5*Distance))<1e-6))){return true;};
-  
+  if(((abs(r-param.Radius) < 1e-6) || abs(h-(param.Height/2))<1e-6)){return true;};
+
   return false;
+
+  
 }
 
 //Check if the particle is in vacuum near aluminium foil
 bool Tracker::VacuumToAluminium(double r)
 {
+  double h = abs(abs(cpoint[2])-0.5*(param.Distance+param.Height));
   //If the particle is in vacuum (either in the air gap or outside the telescope) and near any aluminium foil boundary
-  if(CheckDensity()==0 && ((abs(r-innerradius) < 1e-6) || (abs(r-outerradius) <1e-6) 
-  || (abs(abs(cpoint[2])-(Airgap+0.5*Distance+Height))<1e-6) || (abs(abs(cpoint[2])-(-Airgap+(0.5*Distance)))<1e-6) 
-  || (abs(abs(cpoint[2])-(Thickness+Airgap+0.5*Distance+Height))<1e-6) || (abs(abs(cpoint[2])-(-Thickness-Airgap+(0.5*Distance)))<1e-6) ) )
-  {return true;};
-  
+  if(((abs(r-param.innerradius) < 1e-6) || (abs(r-param.outerradius) <1e-6) || abs(h-(param.Height/2+param.Airgap))<1e-6 )){return true;};
+
   return false;
 }
 
@@ -261,6 +245,9 @@ void Tracker::Propagate_Muon()
     {
       scintillator_cross++; //Plus one scintillator crossed
       Muon_Scintillator_Step();
+      /*if(scintillator_cross == 1){
+        N_photons1 = N_photons;
+      }*/
     }
     if(CheckDensity()==2.7) //Particle is in the aluminium foil
     {
@@ -401,7 +388,6 @@ void Tracker::Propagate_Photons(int n)
           //Execute step (flag = kFALSE means it is an arbitrary step, not limited by geometrical reasons)
           nav->Step(kFALSE);
           Update_Photon(i);
-
           N_absorbed++;
           break;
         } else {
@@ -451,12 +437,14 @@ void Tracker::Propagate_Photons(int n)
 
 void Tracker::InitializePhotonTrack(int i)
 {
-
+#ifdef DRAWMODE
+  Mutex.lock();
   //Add daughter track (photon track) to the main track and set it the current track
   geom->SetCurrentTrack(main_track->AddDaughter(0,Photons[i]->GetPDG(),Photons[i])); //the first argument is not important
+  Mutex.unlock();
   //Add starting position to the track
   geom->GetCurrentTrack()->AddPoint(Photons[i]->GetStartingPosition()[0],Photons[i]->GetStartingPosition()[1],Photons[i]->GetStartingPosition()[2],Photons[i]->GetTime());
-
+#endif
   return;
 }
 
@@ -566,14 +554,14 @@ bool Tracker::Check_Symmetric_Detector()
 {
   double h = abs(cpoint[2]);
 
-  if(h>(0.5*(Height+Distance+SIPM_size)) || h<(0.5*(Height+Distance-SIPM_size))){return false;};
+  if(h>(0.5*(param.Height+param.Distance+param.SIPM_size)) || h<(0.5*(param.Height+param.Distance-param.SIPM_size))){return false;};
 
   double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
-  if(abs(r-Radius)>1e-6){return false;};
+  if(abs(r-param.Radius)>1e-6){return false;};
 
-  double theta = atan(cpoint[1]/cpoint[0])/SIPM_angle;
+  double theta = atan(cpoint[1]/cpoint[0])/param.SIPM_angle;
   double delta = theta - round(theta);
-  if(abs(delta) > SIPM_alpha){return false;};
+  if(abs(delta) > param.SIPM_alpha){return false;};
 
   return true;
 }
@@ -582,18 +570,18 @@ bool Tracker::Is_Detector_Region()
 {
   //Check if the photon is in the right z range
   double h = abs(cpoint[2]);
-  if(h>(0.5*(Height+Distance+SIPM_size)) || h<(0.5*(Height+Distance-SIPM_size))){return false;};
+  if(h>(0.5*(param.Height+param.Distance+param.SIPM_size)) || h<(0.5*(param.Height+param.Distance-param.SIPM_size))){return false;};
 
   //Check if the photon is in the scintillator boundary
   double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
-  if(abs(r-Radius)>1e-6){return false;};
+  if(abs(r-param.Radius)>1e-6){return false;};
 
   //Current phi angle of the photon
   double phi = tools::PhiAngle(cpoint);
   
   //Check if the photon is in the phi angular range of any SIPM
-  for(double SIPM_phi : SIPM_angles){
-    if(abs(phi - SIPM_phi) < SIPM_phi_range/2){
+  for(double SIPM_phi : param.SIPM_angles){
+    if(abs(phi - SIPM_phi) < param.SIPM_phi_range/2){
       return true;
     }
   }
