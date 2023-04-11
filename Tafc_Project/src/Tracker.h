@@ -85,6 +85,8 @@ private:
   int N_photons; //number of emitted photons
   int N_absorbed; //number of absorbed photons in the scintillator
   int N_detected; //number of detected photons (using SIPMS)
+  int N_detected1; //number of detected photons in the first scintillator
+  int N_detected2; //number of detected photons in the second scintillator
   int N_lost; //number of photons absorbed in the aluminium
   bool DoubleCross; // This Flag Checks if the photons have been propagated or not
   bool Photons_flag; //This Flag Checks if the muon has crossed both scintillators

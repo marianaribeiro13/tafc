@@ -11,7 +11,9 @@ std::mutex Mutex;
 Tracker::Tracker(TGeoManager* GeoM, Generator* g, Particle* part, double step, double radius, double height, double distance, double airgap, double althickness, int n_SIPMS,double s_size, std::vector <double> s_angles)
 : stepvalue(step), N_photons(0),N_absorbed(0),N_detected(0),N_lost(0),DoubleCross(false)
 {
-  Radius = radius;
+  //TObjArray* list = geom->GetListOfGVolumes();
+  //Radius = list->FindObject("scintillator")->GetRMax();
+  Radius = radius; 
   Height = height;
   Distance = distance;
 
@@ -72,11 +74,19 @@ Tracker::~Tracker()
   }
   //if(!Photons_flag)
   //{
-    for(int i =0;i<Photons.size();i++){
-      if(Photons[i]){
-        delete Photons[i];
-      }
+  for(int i =0;i<Photons.size();i++){
+    if(Photons[i]){
+      delete Photons[i];
     }
+  }
+  
+  //if(cpoint){
+    //delete cpoint;
+  //}
+
+  //if(cdir){
+    //delete cdir;
+  //}
   //}
 }
 

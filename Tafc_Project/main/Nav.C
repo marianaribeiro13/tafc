@@ -5,6 +5,8 @@
 #include "Tracker.h"
 #include "TApplication.h"
 #include "Modes.h"
+#include "TTree.h"
+#include "TFile.h"
 #include <string>
 #include <chrono>
 #include <thread>
@@ -109,6 +111,96 @@ int main(int argc, char* argv[]){
 
         app.Run();
       }
+    }
+
+    if(argc == 2 && !strcmp(argv[1],"-Disk"))
+    {
+      double initial_x_muon = 0.;
+      double initial_y_muon = 0.;
+      double detector_efficiency = 0.;
+
+      TFile* outfile = new TFile("~/Tafc_Project/DiskEfficiency.root","UPDATE","GeomEfficiency");
+      TTree *tree;
+
+      if(!(outfile->FindKey("DiskEfficiency"))){
+        tree = new TTree("DiskEfficiency","DiskEfficiency");
+        
+        tree->Branch("initial_x_muon",&initial_x_muon,"initial_x_muon/D");
+        tree->Branch("initial_y_muon",&initial_y_muon,"initial_y_muon/D");
+        tree->Branch("detector_efficiency",&detector_efficiency,"detector_efficiency/D");
+      } else {
+        tree = (TTree*)outfile->Get("DiskEfficiency");
+
+        tree->SetBranchAddress("initial_x_muon",&initial_x_muon);
+        tree->SetBranchAddress("initial_y_muon",&initial_y_muon);
+        tree->SetBranchAddress("detector_efficiency",&detector_efficiency);
+      }
+
+      for (int i = 0; i < N_threads; i++) {
+        threads.emplace_back(std::thread(&Modes::DiskEfficiency_Mode, geom, step, radius, height, distance, airgap, 
+        althickness, n_SIPMS, SIPM_size, SIPM_angles, i, muons_per_thread,
+        std::ref(initial_x_muon),std::ref(initial_y_muon), std::ref(detector_efficiency), TTree* tree));
+      }
+
+      //Join threads (wait for all threads to finish before continuing)
+      for (auto &navigator : threads) {
+        navigator.join();
+      }
+
+      tree->Fill();
+      //tree->ResetBranchAddresses();
+      //tree->Write();
+      outfile->Write();
+      outfile->Close();
+
+      std::cout << "DiskEfficiency.root file with TTree created \n\n";
+    }
+
+    if(argc == 2 && !strcmp(argv[1],"-Geo"))
+    {
+
+      TFile* outfile = new TFile("~/Tafc_Project/GeomEfficiency.root","UPDATE","GeomEfficiency");
+      TTree *tree;
+
+      if(!(outfile->FindKey("GeomEfficiency"))){
+        tree = new TTree("GeomEfficiency","GeomEfficiency");
+        
+        tree->Branch("distance",&distance,"distance/D");
+        tree->Branch("Nmuons_total",&Nmuons_total,"Nmuons_total/I");
+        tree->Branch("Nmuons_accepted",&Nmuons_accepted,"Nmuons_accepted/I");
+      } else {
+        tree = (TTree*)outfile->Get("GeomEfficiency");
+
+        tree->SetBranchAddress("distance",&distance);
+        tree->SetBranchAddress("Nmuons_total",&Nmuons_total);
+        tree->SetBranchAddress("Nmuons_accepted",&Nmuons_accepted);
+      }
+
+      for (int i = 0; i < N_threads; i++) {
+        threads.emplace_back(std::thread(&Modes::GeomEfficiency_Mode, geom, step, radius, height, distance, airgap, 
+        althickness, n_SIPMS, SIPM_size, SIPM_angles, i, muons_per_thread,
+        std::ref(Nmuons_total)));
+      }
+
+      //Join threads (wait for all threads to finish before continuing)
+      for (auto &navigator : threads) {
+        navigator.join();
+      }
+
+      tree->Fill();
+      //tree->ResetBranchAddresses();
+      //tree->Write();
+      outfile->Write();
+      outfile->Close();
+
+      /////////////////////////////////////////// Print of Results /////////////////////////////////
+
+      std::cout << "\n\n\n" << "//////////////////////// FINAL RESULTS ////////////////////////" << "\n\n";
+      std::cout << "Total Muons Generated: " << Nmuons_total << '\n';
+      std::cout << "Total Muons Accepted (Cross both scintillators): " << Nmuons_accepted << '\n';
+      std::cout << "Geometrical acceptance: " << 100*(double)Nmuons_accepted/Nmuons_total << "% \n\n";
+
+      std::cout << "GeomEfficiency.root file with TTree created \n\n";
     }
 
     auto end = std::chrono::high_resolution_clock::now(); //Program end time

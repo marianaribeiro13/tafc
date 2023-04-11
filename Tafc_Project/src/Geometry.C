@@ -47,7 +47,7 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
     TGeoTranslation *tr2 = new TGeoTranslation(0., 0., - (double)(distance + height)/2.);
 
     TGeoVolume *scintillator = geom->MakeTube("scintillator", Plastic, 0, radius, height/2.); // rmin, rmax, mid height
-    scintillator->SetLineColor(kOrange+10);
+    scintillator->SetLineColor(kGreen+10);
     top->AddNode(scintillator, 1, tr1);
     top->AddNode(scintillator, 2, tr2);
 
