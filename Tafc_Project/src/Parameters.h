@@ -16,7 +16,7 @@ struct Parameters{
     
     const double Radius = 5.0;  //Scintillator radius
 	const double Height = 1.0;  //Scintillator height
-	const double Distance = 25.;  //Distance between the two scintillators
+	double Distance = 25.;  //Distance between the two scintillators
 	const double Thickness = 0.0016; //Aluminium foil thickness
 	const double Airgap = .1; //Air gap thickness between the scintillator and the aluminium foil
     

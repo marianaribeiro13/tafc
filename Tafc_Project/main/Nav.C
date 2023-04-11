@@ -129,7 +129,7 @@ int main(int argc, char* argv[]){
 
       for (int i = 0; i < param.N_threads; i++) {
         threads.emplace_back(std::thread(DiskEfficiency_Mode, geom, t+i, std::ref(initial_x_muon),
-                              std::ref(initial_y_muon), std::ref(detector_efficiency), TTree* tree));
+                              std::ref(initial_y_muon), std::ref(detector_efficiency), tree));
       }
 
       //Join threads (wait for all threads to finish before continuing)
@@ -155,15 +155,15 @@ int main(int argc, char* argv[]){
       if(!(outfile->FindKey("GeomEfficiency"))){
         tree = new TTree("GeomEfficiency","GeomEfficiency");
         
-        tree->Branch("distance",&distance,"distance/D");
+        tree->Branch("distance",&param.Distance,"distance/D");
         tree->Branch("Nmuons_total",&Nmuons_total,"Nmuons_total/I");
-        tree->Branch("Nmuons_accepted",&Nmuons_accepted,"Nmuons_accepted/I");
+        tree->Branch("Nmuons_accepted",&param.Nmuons_accepted,"Nmuons_accepted/I");
       } else {
         tree = (TTree*)outfile->Get("GeomEfficiency");
 
-        tree->SetBranchAddress("distance",&distance);
+        tree->SetBranchAddress("distance",&param.Distance);
         tree->SetBranchAddress("Nmuons_total",&Nmuons_total);
-        tree->SetBranchAddress("Nmuons_accepted",&Nmuons_accepted);
+        tree->SetBranchAddress("Nmuons_accepted",&param.Nmuons_accepted);
       }
 
       for (int i = 0; i < param.N_threads; i++){
@@ -184,9 +184,10 @@ int main(int argc, char* argv[]){
       /////////////////////////////////////////// Print of Results /////////////////////////////////
 
       std::cout << "\n\n\n" << "//////////////////////// FINAL RESULTS ////////////////////////" << "\n\n";
+      std::cout << "Distance between scintillators: " << param.Distance << '\n';
       std::cout << "Total Muons Generated: " << Nmuons_total << '\n';
-      std::cout << "Total Muons Accepted (Cross both scintillators): " << Nmuons_accepted << '\n';
-      std::cout << "Geometrical acceptance: " << 100*(double)Nmuons_accepted/Nmuons_total << "% \n\n";
+      std::cout << "Total Muons Accepted (Cross both scintillators): " << param.Nmuons_accepted << '\n';
+      std::cout << "Geometrical acceptance: " << 100*(double)param.Nmuons_accepted/Nmuons_total << "% \n\n";
 
       std::cout << "GeomEfficiency TTree added to ProjectResults.root \n\n";
     }

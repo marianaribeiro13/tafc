@@ -18,7 +18,7 @@ int& Nmuons_total, int& Nphotons_total, int& Nphotons_detected, int& Nphotons_ab
 
   Parameters param;
 
-  int N_muons = param.Nmuons_accepted;
+  int N_muons = param.muons_per_thread;
 
   for(int j = 0; j < N_muons; j++){
 
@@ -68,7 +68,7 @@ void Draw_Mode(TGeoManager* geom, int seed, int N_photons_draw)
   Generator* gen = new Generator(seed); // I think this should be inside lock but it is working fine
 
   Parameters param;
-  int N_muons = param.Nmuons_accepted;
+  int N_muons = param.muons_per_thread;
 
   for(int j = 0; j < N_muons; j++){
 
@@ -100,14 +100,12 @@ void DiskEfficiency_Mode(TGeoManager* geom, int seed, double& initial_x_muon,
   Generator* gen = new Generator(seed); // I think this should be inside lock but it is working fine
 
   Parameters param;
-  int N_muons = param.Nmuons_accepted;
+  int N_muons = param.muons_per_thread;
 
   for(int j = 0; j < N_muons; j++){
 
     //Generate random muon in the scintillator incident plane to add to the simulation
     Particle* Muon = gen->Generate_CosmicMuon(gen->Generate_Position(param.Distance, param.Height, param.Radius));
-    initial_x_muon = Muon->GetStartingPosition()[0];
-    initial_y_muon = Muon->GetStartingPosition()[1];
 
     //Create Tracker object
     Tracker Simulation(geom, gen, Muon);
@@ -118,9 +116,14 @@ void DiskEfficiency_Mode(TGeoManager* geom, int seed, double& initial_x_muon,
     //Check if the muon crossed both scintillators (If it did propagate photons)
     if(Simulation.GetDoubleCross()){
       Simulation.Propagate_Photons(Simulation.GetN_photons());
+      
+      mu.lock();
       detector_efficiency = Simulation.GetN_detected()/Simulation.GetN_photons();
+      initial_x_muon = Muon->GetStartingPosition()[0];
+      initial_y_muon = Muon->GetStartingPosition()[1];
       tree->Fill();
-
+      mu.unlock();
+      
     } else {
       N_muons++; //The muon was not accepted - propagate one more
     }
@@ -143,7 +146,7 @@ void GeomEfficiency_Mode(TGeoManager* geom, int seed, int& Nmuons_total)
   Generator* gen = new Generator(seed); // I think this should be inside lock but it is working fine
 
   Parameters param;
-  int N_muons = param.Nmuons_accepted;
+  int N_muons = param.muons_per_thread;
 
   for(int j = 0; j < N_muons; j++){
 

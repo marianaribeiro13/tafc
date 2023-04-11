@@ -1,5 +1,5 @@
-#ifndef __Modes__
-#define __Modes__
+#ifndef Modes
+#define Modes
 
 #include "tools.h"
 #include "Particle.h"
