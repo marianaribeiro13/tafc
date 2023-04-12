@@ -134,6 +134,7 @@ int main(int argc, char* argv[]){
         tree->Branch("initial_x_muon",&initial_x_muon,"initial_x_muon/D");
         tree->Branch("initial_y_muon",&initial_y_muon,"initial_y_muon/D");
         tree->Branch("detector_efficiency",&detector_efficiency,"detector_efficiency/D");
+        tree->Branch("NSIMPs",&param.n_SIPM,"NSIMPs/I");
         
       } else {
         tree = (TTree*)outfile->Get("DiskEfficiency");
@@ -141,6 +142,7 @@ int main(int argc, char* argv[]){
         tree->SetBranchAddress("initial_x_muon",&initial_x_muon);
         tree->SetBranchAddress("initial_y_muon",&initial_y_muon);
         tree->SetBranchAddress("detector_efficiency",&detector_efficiency);
+        tree->SetBranchAddress("NSIMPs",&param.n_SIPM);
       }
 
       for (int i = 0; i < param.N_threads; i++) {
