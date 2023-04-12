@@ -229,6 +229,7 @@ int main(int argc, char* argv[]){
         if(!(outfile->FindKey(name.c_str()))){
           tree = new TTree(name.c_str(),name.c_str());
         
+          tree->Branch("Nmuons_accepted",&param.Nmuons_accepted,"Nmuons_accepted/I");
           tree->Branch("Nphotons_total",&Nphotons_total,"Nphotons_total/I");
           tree->Branch("Nphotons_detected",&Nphotons_detected,"Nphotons_detected/I");
           tree->Branch("NSIMPs",&param.n_SIPM,"NSIMPs/I");
@@ -236,6 +237,7 @@ int main(int argc, char* argv[]){
         } else {
           tree = (TTree*)outfile->Get(name.c_str());
 
+          tree->SetBranchAddress("Nmuons_accepted",&param.Nmuons_accepted);
           tree->SetBranchAddress("Nphotons_total",&Nphotons_total);
           tree->SetBranchAddress("Nphotons_detected",&Nphotons_detected);
           tree->SetBranchAddress("NSIMPs",&param.n_SIPM);
@@ -266,6 +268,7 @@ int main(int argc, char* argv[]){
         /////////////////////////////////////////// Print of Results /////////////////////////////////
 
         std::cout << "\n\n\n" << "//////////////////////// FINAL RESULTS ////////////////////////" << "\n\n";
+        std::cout << "Total Muons Accepted (Cross both scintillators): " << param.Nmuons_accepted << '\n';
         std::cout << "Number of SIPMs per scintillator: " << param.n_SIPM << '\n';
         std::cout << "Total Photons Generated: " << Nphotons_total << '\n';
         std::cout << "Photons Detected: " << Nphotons_detected << '\n';
@@ -285,12 +288,14 @@ int main(int argc, char* argv[]){
       if(!(outfile->FindKey("HeatMap"))){
         tree = new TTree("HeatMap","HeatMap");
         
+        tree->Branch("Nmuons_accepted",&param.Nmuons_accepted,"Nmuons_accepted/I");
         tree->Branch("photon_z",&photon_z,"photon_z/D");
         tree->Branch("photon_phi",&photon_phi,"photon_phi/D");
         
       } else {
         tree = (TTree*)outfile->Get("HeatMap");
 
+        tree->SetBranchAddress("Nmuons_accepted",&param.Nmuons_accepted);
         tree->SetBranchAddress("photon_z",&photon_z);
         tree->SetBranchAddress("photon_phi",&photon_phi);
       }

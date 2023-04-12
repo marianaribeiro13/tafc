@@ -5,7 +5,7 @@ struct Parameters{
 
     ////////////////////// PROPAGATION PARAMETERS ////////////////////////
 
-    int Nmuons_accepted = 24; // Number of muons to propagate (they have to cross both detectors)
+    int Nmuons_accepted = 320; // Number of muons to propagate (they have to cross both detectors)
     const int N_threads = 8; // Number of threads to use in propagation
     const int muons_per_thread = Nmuons_accepted/N_threads; // Number of accepted muons to propagate on each thread
     
@@ -23,7 +23,7 @@ struct Parameters{
     const double innerradius = Radius + Airgap;
     const double outerradius = Radius + Airgap + Thickness;
 	
-    int n_SIPM = 4; //Number of SIPMS per scintillator (not being used now)
+    int n_SIPM = 2; //Number of SIPMS per scintillator (not being used now)
 	const double SIPM_size = .6; //SIPM_size (the detector area is SIPM_size*SIPM_size)
     //Phi angle of each SIPM placed on center of lateral scintillator wall (size of the vector is the number of SIPMs per scintillator)
     std::vector <double> SIPM_angles {0., M_PI/2, M_PI, 3*M_PI/2}; 
