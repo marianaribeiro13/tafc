@@ -32,7 +32,6 @@ struct Parameters{
 	const double SIPM_alpha = 0.5*SIPM_size/(SIPM_angle*Radius);
     const double SIPM_phi_range = SIPM_size/Radius; //Approximate SIPM phi range (assumes SIPM size much smaller than scintillator radius)
     
-
 };
 
 #endif

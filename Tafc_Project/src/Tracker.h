@@ -69,6 +69,8 @@ public:
 
   double BetheBloch(double v);
 
+  std::vector<std::pair<double,double>> PropagatePhotons_To_FirstBoundary(int iphoton, int fphoton);
+
   //void Reset();
 
 private:

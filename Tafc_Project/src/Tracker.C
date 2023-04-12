@@ -399,7 +399,7 @@ void Tracker::Propagate_Photons(int iphoton, int fphoton)
           Photon_Scintillator_Reflection_Check(i);
         }
 
-        if(Is_Photon_Detected(Photons[i]->GetEnergy())) //Check if photon is detected
+        if(DetectionCheck(Photons[i]->GetEnergy())) //Check if photon is detected
         {
           N_detected++;
           break;
@@ -605,6 +605,26 @@ double Tracker::BetheBloch(double v){
 
     return ((qe*qe*qe*qe*n_density*Z*Z*(log((2*me*c*c*v*v)/(I*(1-v*v)))-v*v))/(4*M_PI*eps0*eps0*me*c*c*v*v))/(1.602e-13);
 }
+
+std::vector<std::pair<double,double>> Tracker::PropagatePhotons_To_FirstBoundary(int iphoton, int fphoton)
+{
+  std::vector<std::pair<double,double>> points;
+  
+  for(int i=iphoton; i<fphoton; i++){
+
+    nav->InitTrack(Photons[i]->GetStartingPosition().data(), Photons[i]->GetDirection().data());
+    nav->FindNextBoundary();
+    nav->Step(kTRUE,kFALSE);
+    double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
+    
+    if(abs(r-param.Radius)<1e-6){
+      points.emplace_back(std::make_pair(tools::PhiAngle(cpoint), cpoint[2] - param.Distance/2));
+    }
+  }
+
+  return points;
+}
+
 
 //Deletes the muon and all the photons, resets the counters and flags and clears all tracks from the geometry
 /*void Tracker::Reset(){

@@ -30,6 +30,11 @@ void DiskEfficiency_Mode(TGeoManager* geom, int seed, double& initial_x_muon,
                          double& initial_y_muon, double& detector_efficiency, TTree* tree);
 
 void GeomEfficiency_Mode(TGeoManager* geom, int seed, int& Nmuons_total);
+
+void DetectionEfficiency_Mode(TGeoManager* geom, int seed, int& Nphotons_total, 
+                              int& Nphotons_detected, TTree* tree, int scintillator);
+
+void Heatmap_Mode(TGeoManager* geom, int seed, double& phi, double& z, TTree* tree);
     
 
 #endif

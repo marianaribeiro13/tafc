@@ -122,7 +122,7 @@ void DiskEfficiency_Mode(TGeoManager* geom, int seed, double& initial_x_muon,
       Simulation.Propagate_Photons(0,Simulation.GetN_photons1());
       
       mu.lock();
-      detector_efficiency = (double)Simulation.GetN_detected()/Simulation.GetN_photons1();
+      detector_efficiency = 100*(double)Simulation.GetN_detected()/Simulation.GetN_photons1();
       initial_x_muon = Muon->GetStartingPosition()[0];
       initial_y_muon = Muon->GetStartingPosition()[1];
       tree->Fill();
@@ -179,105 +179,112 @@ void GeomEfficiency_Mode(TGeoManager* geom, int seed, int& Nmuons_total)
   mu.unlock();
 }
 
+void DetectionEfficiency_Mode(TGeoManager* geom, int seed, int& Nphotons_total, int& Nphotons_detected, TTree* tree, int scintillator){
 
+  std::thread::id this_id = std::this_thread::get_id(); //Thread id
 
-/*void Heatmap_Mode(Tracker* T, DataManager* Data)
-{
-  for(int i=0;i<1000;i++)
-  {
-    T->Propagate_Muon();
-    Data->Fill_Heatmap(T);
-    T->Generate_New_Muon();
-  }
+  //Initialize variables
+  int Nphotons_total_thisthread = 0;
+  int Nphotons_detected_thisthread = 0;
 
-  Data->Draw_Heatmap("Photon_Heatmap.pdf");
+  Generator* gen = new Generator(seed); // I think this should be inside lock but it is working fine
 
-  return;
-}
+  Parameters param;
 
-void HeatmapSingle_Mode(Tracker* T,DataManager* Data)
-{
-  T->Propagate_Muon();
-  Data->Fill_Heatmap(T);
-  T->Generate_New_Muon();
-  Data->Draw_Heatmap("Single_Photon_Heatmap.pdf");
-}
+  int N_muons = param.muons_per_thread;
 
-void GeomEfficiency_Mode(Tracker* T,DataManager* Data)
-{
-  int N = 1000;
-  int n=0;
-  for(int i =0;i<N;i++)
-  {
-    cout<<i<<endl;
-    T->Propagate_Muon();
-    if(T->GetDoubleCross())
-    {
-      n++;
+  for(int j = 0; j < N_muons; j++){
+
+    //Generate random muon in the scintillator incident plane to add to the simulation
+    Particle* Muon = gen->Generate_CosmicMuon(gen->Generate_Position(param.Distance, param.Height, param.Radius));
+
+    //Create Tracker object
+    Tracker Simulation(geom, gen, Muon);
+
+    //Propagate muon and create emited photons
+    Simulation.Propagate_Muon();
+
+    //Check if the muon crossed both scintillators (If it did propagate photons)
+    if(Simulation.GetDoubleCross()){
+
+      if(scintillator == 1){
+
+        Simulation.Propagate_Photons(0,Simulation.GetN_photons1());
+        Nphotons_total_thisthread += Simulation.GetN_photons1();
+
+      }else{ //scintillator == 2
+
+        Simulation.Propagate_Photons(Simulation.GetN_photons1(),Simulation.GetN_photons());
+        Nphotons_total_thisthread += Simulation.GetN_photons() - Simulation.GetN_photons1();
+      } 
+    
+      Nphotons_detected_thisthread += Simulation.GetN_detected();
+
+    } else {
+      N_muons++; //The muon was not accepted - propagate one more
     }
-    T->Generate_New_Muon();
   }
-  cout<<(double) n/N<<endl;
-  return;
-}*/
+  
+  delete gen;
 
-// void EMap_Mode(Tracker* T, DataManager* Data)
-// {
-//   vector<double> d = {0,0,-1};
-//   vector<double> x = {0,0,0};
-//   x[2] = T->GetHeight()+T->GetDistance()/2 - 1e-12;
-//
-//   Particle* M0 = new Particle(13,1000,d,x);
-//   T->Insert_New_Muon(M0);
-//   T->Propagate_Muon();
-//   T->Propagate_Photons();
-//   Data->Fill_Efficiency_Map(T);
-//
-//   for(int i=0;i<10;i++)
-//   {
-//     cout<<i<<endl;
-//     for(int j=0;j<10;j++)
-//     {
-//       x[0] = (double) (i/10) * T->GetRadius() * cos((double) (j/100) * 2 *M_PI);
-//       x[1] = (double) (i/10) * T->GetRadius() * sin((double) (j/100) * 2 *M_PI);
-//
-//       Particle* M = new Particle(13,1000,d,x);
-//       T->Insert_New_Muon(M);
-//       T->Propagate_Muon();
-//       T->Propagate_Photons();
-//       Data->Fill_Efficiency_Map(T);
-//
-//     }
-//   }
-//
-//   Data->Draw_Efficiency_Map("Efficiency_Map.pdf");
-//   return;
-// }
-
-/*void Draw_Mode(Tracker T, int Nphotons)
-{
-
-
-  T.Propagate_Muon();
-  TApplication app("app", nullptr, nullptr);
-  T->Draw(n);
-  app.Run();
-
-  return;
+  //Locked stuff happens one thread at a time
+  mu.lock();
+  std::cout << "thread " << this_id << "\n\n"; //Print thread id
+  //std::cout << "\n\n" << "ThreadID: " << Simulation.GetNavigator()->GetThreadId();
+  Nphotons_total += Nphotons_total_thisthread;
+  Nphotons_detected += Nphotons_detected_thisthread;
+  mu.unlock();
 }
 
-void Simulation_Mode(Tracker T, int& Nphotons_total, int& Nphotons_detected, int& Nphotons_absorbed, int& Nphotons_lost)
-{
-  //Propagate muon and create emited photons
-  T.Propagate_Muon();
+void Heatmap_Mode(TGeoManager* geom, int seed, double& phi, double& z, TTree* tree){
 
-  //Check if the muon crossed both scintillators (If it did propagate photons)
-  if(T.GetDoubleCross())
-  {
-    T.Propagate_Photons(Simulation.GetN_photons());
-    Nphotons_total += Simulation.GetN_photons();
-    Nphotons_detected += Simulation.GetN_detected();
-    Nphotons_absorbed += Simulation.GetN_absorbed();
-    Nphotons_lost += Simulation.GetN_lost();
+  std::thread::id this_id = std::this_thread::get_id(); //Thread id
+
+  Generator* gen = new Generator(seed); // I think this should be inside lock but it is working fine
+
+  Parameters param;
+  int N_muons = param.muons_per_thread;
+
+  for(int j = 0; j < N_muons; j++){
+
+    //Generate random muon in the scintillator incident plane to add to the simulation
+    Particle* Muon = gen->Generate_CosmicMuon(gen->Generate_Position(param.Distance, param.Height, param.Radius));
+
+    //Create Tracker object
+    Tracker Simulation(geom, gen, Muon);
+
+    //Propagate muon and create emited photons
+    Simulation.Propagate_Muon();
+
+    //Check if the muon crossed both scintillators (If it did propagate photons)
+    if(Simulation.GetDoubleCross()){
+      std::vector<std::pair<double,double>> points = Simulation.PropagatePhotons_To_FirstBoundary(0,Simulation.GetN_photons1());
+      
+      mu.lock();
+      for(auto point : points){
+        phi = point.first;
+        z = point.second;
+        tree->Fill();
+      }
+      mu.unlock();
+
+    } else {
+      N_muons++; //The muon was not accepted - propagate one more
+    }
+
   }
-}*/
+  
+  delete gen;
+
+  //Locked stuff happens one thread at a time
+  mu.lock();
+  std::cout << "thread " << this_id << "\n\n"; //Print thread id
+  mu.unlock();
+  
+}
+
+
+
+
+
+
