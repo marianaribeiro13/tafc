@@ -34,7 +34,7 @@ $(LIBDIR)/libFC.a: $(OBJ)
 
 %.exe: $(BINDIR)/%.o $(LIBDIR)/libFC.a 
 	@echo compilink and linking... 
-	$(CC) -I src $< -o $(BINDIR)/$@ -L lib -l FC $(ROOTLIB) -lGeom -lEG -lpthread -lstdc++fs
+	$(CC) -I src $< -o $(BINDIR)/$@ -L lib -l FC $(ROOTLIB) -lGeom -lEG -lpthread
 
 $(BINDIR)/%.o: %.C | $(INC)
 	@echo compiling... $<

@@ -84,6 +84,7 @@ void Draw_Mode(TGeoManager* geom, int seed, int N_photons_draw)
     //Check if the muon crossed both scintillators (If it did propagate photons)
     if(Simulation.GetDoubleCross()){
       int m = Simulation.GetN_photons()/N_photons_draw;
+      std::cout << "m: " << m << '\n';
       for(int k=0; k<N_photons_draw; k++){
         int i=m*k;
         Simulation.Propagate_Photons(i,i+1);

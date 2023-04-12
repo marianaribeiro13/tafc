@@ -5,8 +5,8 @@ struct Parameters{
 
     ////////////////////// PROPAGATION PARAMETERS ////////////////////////
 
-    int Nmuons_accepted = 2; // Number of muons to propagate (they have to cross both detectors)
-    const int N_threads = 2; // Number of threads to use in propagation
+    int Nmuons_accepted = 24; // Number of muons to propagate (they have to cross both detectors)
+    const int N_threads = 8; // Number of threads to use in propagation
     const int muons_per_thread = Nmuons_accepted/N_threads; // Number of accepted muons to propagate on each thread
     
     double step = 0.001; // Tracker step (cm)

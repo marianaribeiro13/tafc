@@ -28,12 +28,12 @@ Tracker::Tracker(TGeoManager* GeoM, Generator* g, Particle* part)
   Mutex.lock();
   //Add muon track to the Navigator and assign it to main_track atribute
   int track_index = geom->AddTrack(0,Muon->GetPDG(),Muon); //The first argument is not important
-  Mutex.unlock();
 
   main_track = geom->GetTrack(track_index); //Get muon track
   //Add starting point to the track (initial position of the muon) and set main_track as the current track
   main_track->AddPoint(Muon->GetStartingPosition()[0],Muon->GetStartingPosition()[1],Muon->GetStartingPosition()[2],0);
   geom->SetCurrentTrack(track_index);
+  Mutex.unlock();
  
 #endif
   
@@ -139,8 +139,8 @@ vector<double> Tracker::GetNormal()
   double h = abs(cpoint[2]);
   vector<double> aux(3);
   bool horizontal_reflection =false,vertical_reflection=false;
-  //vector<double> d = {cdir[0], cdir[1], cdir[2]};
-  vector<double> d = {nav->GetCurrentDirection()[0],nav->GetCurrentDirection()[1],nav->GetCurrentDirection()[2]};
+  vector<double> d = {cdir[0], cdir[1], cdir[2]};
+  //vector<double> d = {nav->GetCurrentDirection()[0],nav->GetCurrentDirection()[1],nav->GetCurrentDirection()[2]};
 
   if(abs(r-param.Radius) <1e-6 || abs(r-param.innerradius) <1e-6 || abs(r-param.outerradius) <1e-6)
   {
@@ -257,10 +257,10 @@ void Tracker::Propagate_Muon()
 
   if(scintillator_cross < 2){ //The particle crosses both scintillators
 #ifdef DRAWMODE
-    //Mutex.lock();
+    Mutex.lock();
     //geom->ClearTracks();
     main_track->ResetTrack();
-    //Mutex.unlock();
+    Mutex.unlock();
 #endif
   }else { 
     DoubleCross=true;
@@ -275,10 +275,10 @@ void Tracker::Muon_Vacuum_Step()
   nav->FindNextBoundaryAndStep(); //Make step to the next boundary and cross it (updates current position of the navigator)
   Muon->ChangePosition(cpoint); //Update muon object position
 #ifdef DRAWMODE
-  //Mutex.lock();
+  Mutex.lock();
   Muon->IncreaseTime(nav->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
   main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
-  //Mutex.unlock();
+  Mutex.unlock();
 #endif
   return;
 }
@@ -294,10 +294,10 @@ void Tracker::Muon_Scintillator_Step()
     nav->Step(kFALSE); //Updates the current position of the navigator
     Muon->ChangePosition(cpoint); //Update muon object position
 #ifdef DRAWMODE
-    //Mutex.lock();
+    Mutex.lock();
     Muon->IncreaseTime(stepvalue/(Muon->GetVelocity()*2.998e10)); //Update time
     main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
-    //Mutex.unlock();
+    Mutex.unlock();
 #endif
     //Get number of photons from Poisson distribution (usually approximatly 1 photon per 100 eV for common scintillators)
     int n = generator->Generate_Photon_Number(10000*Update_Energy(stepvalue)); //Energy is converted to MeV
@@ -314,10 +314,10 @@ void Tracker::Muon_Scintillator_Step()
   nav->FindNextBoundaryAndStep(stepvalue); //Make step to the next boundary and cross it (step is less than the defined step)
   Muon->ChangePosition(cpoint); //Update muon object position
 #ifdef DRAWMODE
-  //Mutex.lock();
+  Mutex.lock();
   Muon->IncreaseTime(nav->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
   main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
-  //Mutex.unlock();
+  Mutex.unlock();
 #endif
   //Get number of photons from Poisson distribution (usually approximatly 1 photon per 100 eV for common scintillators)
   int n = generator->Generate_Photon_Number(10000*Update_Energy(nav->GetStep()));
@@ -339,10 +339,10 @@ void Tracker::Muon_Aluminium_Step()
   nav->FindNextBoundaryAndStep(); //Make step to the next boundary and cross it (updates current position of the navigator)
   Muon->ChangePosition(cpoint); //Update muon object position
 #ifdef DRAWMODE
-  //Mutex.lock();
+  Mutex.lock();
   Muon->IncreaseTime(nav->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
   main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
-  //Mutex.unlock();
+  Mutex.unlock();
 #endif
   return;
 }
@@ -438,12 +438,12 @@ void Tracker::Propagate_Photons(int iphoton, int fphoton)
 void Tracker::InitializePhotonTrack(int i)
 {
 #ifdef DRAWMODE
-  Mutex.lock();
+  //Mutex.lock();
   //Add daughter track (photon track) to the main track and set it the current track
-  geom->SetCurrentTrack(main_track->AddDaughter(0,Photons[i]->GetPDG(),Photons[i])); //the first argument is not important
-  Mutex.unlock();
+  geom->SetCurrentTrack(main_track->AddDaughter(i,Photons[i]->GetPDG(),Photons[i])); //the first argument is not important
   //Add starting position to the track
   geom->GetCurrentTrack()->AddPoint(Photons[i]->GetStartingPosition()[0],Photons[i]->GetStartingPosition()[1],Photons[i]->GetStartingPosition()[2],Photons[i]->GetTime());
+  //Mutex.unlock();
 #endif
   return;
 }
@@ -559,7 +559,7 @@ bool Tracker::Check_Symmetric_Detector()
   double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
   if(abs(r-param.Radius)>1e-6){return false;};
 
-  double theta = atan(cpoint[1]/cpoint[0])/param.SIPM_angle;
+  double theta = tools::PhiAngle(cpoint)/param.SIPM_angle;
   double delta = theta - round(theta);
   if(abs(delta) > param.SIPM_alpha){return false;};
 

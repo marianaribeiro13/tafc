@@ -1,199 +1,325 @@
-#include "Generators.h"
+#include "Generator.h"
 #include "Geometry.h"
 #include "tools.h"
 #include "Particle.h"
 #include "Tracker.h"
-#include "DataManager.h"
 #include "TApplication.h"
+#include "Modes.h"
+#include "TTree.h"
+#include "TFile.h"
 #include <string>
 #include <chrono>
-//#include <thread>
-using namespace std;
+#include <thread>
+//#include <filesystem>
 
-/*
-//function for multithreading
-void multiple_muons(Tracker *T)
-{
-  T->Propagate_Muon();
-  if(T->GetDoubleCross())
-  {
-    T->Propagate_Photons(T->GetN_photons());
-    //Data->Extract_Data(T,i);
-  }
-  delete T;
-}*/
+int main(int argc, char* argv[]){
+  
+    auto start = std::chrono::high_resolution_clock::now(); //Program start time
+    //std::string path = std::filesystem::current_path();
 
-int main(int argc, char* argv[])
-{
-  //int t0 = time(0),t1=0;
-  auto start = std::chrono::high_resolution_clock::now();
+    int t = time(0);
 
-  double radius = 5.0;
-  double height = 1.0;
-  double distance = 25.;
-  double airgap = .1;
-  double althickness = 0.0016;
-  double step = 0.001;
-  int n_SIPMS = 4;
-  double SIPM_size = .6;
+    //unsigned int nthreads = std::thread::hardware_concurrency();
+    //std::cout << "Available number of threads: " << nthreads << '\n';
+  
+    //Initialize variables used in more than one mode
+    int Nmuons_total = 0; // Total number of generated muons
+    int Nphotons_total = 0; // Total number of photons (only for accepted muons)
+    int Nphotons_detected = 0; // Number of photons detected in SIPMs (only for accepted muons)
 
-  //int nThreads, tid;
+    std::vector<std::thread> threads; //vector of threads (each thread has one TGeoNavigator)
 
-  //vector <thread> threads;
+    Geometry World; //Instantiate geometry object - create pointer to geometry
 
-  if(argc == 1) //Simulates a single muon
-  {
-    Generator* gen = new Generator();
-    for(int i=0;i<10;i++)
-    {
-    Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen,n_SIPMS,SIPM_size);
-    T->Propagate_Muon();
-    T->Propagate_Photons(T->GetN_photons());
+    Parameters param;
 
-    cout<<endl<<"Total Photons Generated: "<<T->GetN_photons()<<endl;
-    cout<<"Photons Absorbed: "<<T->GetN_absorbed()<<endl;
-    cout<<"Photons Detected: "<<T->GetN_detected()<<endl;
-    cout<<"Photons Lost: "<<T->GetN_lost()<<endl;
-    delete T;
+    //Create Muon Telescope
+    World.Build_MuonTelescope(param.Radius, param.Height, param.Distance, param.Airgap, param.Thickness);
+
+    TGeoManager* geom = World.GetGeoManager(); //Get pointer to telescope geometry
+    
+    geom->SetMaxThreads(param.N_threads); //Set maximum number of threads and creates thread private data for all geometry objects.
+    
+
+    ////////////////////////////////////////// SIMULATION MODE ////////////////////////////////////////////////////
+    
+    if(argc == 1){
+      int Nphotons_absorbed = 0; // Number of photons absorbed in the scintillators
+      int Nphotons_lost = 0; // Number of photons lost in the aluminium
+
+      //Start propagation in the threads
+      for (int i = 0; i < param.N_threads; i++) {
+        threads.emplace_back(std::thread(Simulation_Mode, geom, t+i, std::ref(Nmuons_total),
+                                          std::ref(Nphotons_total), std::ref(Nphotons_detected), 
+                                          std::ref(Nphotons_absorbed), std::ref(Nphotons_lost)));
+      }
+
+      //Join threads (wait for all threads to finish before continuing)
+      for (auto &navigator : threads) {
+        navigator.join();
+      }
+
+      /////////////////////////////////////////// Print of Results /////////////////////////////////
+
+      std::cout << "\n\n\n" << "//////////////////////// FINAL RESULTS ////////////////////////" << "\n\n";
+      std::cout << "Total Muons Generated: " << Nmuons_total << '\n';
+      std::cout << "Total Muons Accepted (Cross both scintillators): " << param.Nmuons_accepted << '\n';
+      std::cout << "Geometrical acceptance: " << 100*(double)param.Nmuons_accepted/Nmuons_total << "% \n\n";
+      std::cout << "Total Photons Generated: " << Nphotons_total << '\n';
+      std::cout << "Photons Detected: " << Nphotons_detected << '\n';
+      std::cout << "Photons Absorbed: " << Nphotons_absorbed << '\n';
+      std::cout << "Photons Lost in Aluminium: " << Nphotons_lost << '\n';
+      std::cout << "Photon Detection efficiency: " << 100*(double)Nphotons_detected/Nphotons_total << "% \n\n";
     }
-    //t1 = time(0);
-    //cout<<"Time elapsed: "<<t1-t0<<" seconds"<<endl;
 
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<float> duration = end - start;
-    std::cout << duration.count() << "s " << std::endl;
 
-    cout<<"Muons Simulated: "<<1<<endl;
-    return 0;
-  }
-
-  if(argc == 2) //Simulates n muons
-  {
-    int n_muons=0;
-    if(sscanf(argv[1],"%d",&n_muons))
+    ////////////////////////////////////////// DRAW MODE ////////////////////////////////////////////////////
+    
+    if(argc == 3 && !strcmp(argv[1],"-draw"))
     {
-      DataManager *Data = new DataManager(n_muons);
-      int N_photons=0,N_absorbed=0,N_detected=0,N_lost=0;
-      Generator* gen = new Generator();
-      /*
-      //create multiple threads with the muons
-      for(int i=0;i<n_muons;i++)
-      {
-        cout<<endl<<"Muon: "<<i<<endl<<endl;
-        Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen,n_SIPMS,SIPM_size);
-        thread t(multiple_muons, T);
-        threads.push_back(move(t));
-      }*/
-      for(int i=0;i<n_muons;i++)
-      {
-        cout<<endl<<"Muon: "<<i<<endl<<endl;
 
-        Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen,n_SIPMS,SIPM_size);
-        T->Propagate_Muon();
-        if(T->GetDoubleCross())
-        {
-          T->Propagate_Photons(T->GetN_photons());
-          Data->Extract_Data(T,i);
+      int N_photons_draw = 0; //Variable that will store the number of photons drawn per muon
+      if(sscanf(argv[2],"%d",&N_photons_draw)){
+        //Start propagation in the threads
+        for (int i = 0; i < param.N_threads; i++) {
+          threads.emplace_back(std::thread(Draw_Mode, geom, t+i, N_photons_draw));
         }
-        delete T;
-      }
-      /*
-      //wait for threads to finish before carrying on
-      for(auto &t: threads){
-          t.join();
-        }*/
-      for(int i=0;i<n_muons;i++)
-      {
-        Data->Print_Data(i);
-      }
-      Data->Draw_Efficiency_Graph();
-      //t1 = time(0);
-      //cout<<"Time elapsed: "<<t1-t0<<" seconds"<<endl;
 
-      auto end = std::chrono::high_resolution_clock::now();
-      std::chrono::duration<float> duration = end - start;
-      std::cout << duration.count() << "s " << std::endl;
+        //Join threads (wait for all threads to finish before continuing)
+        for (auto &navigator : threads) {
+          std::cout << "\n///////////////Before Join ////////////////\n" << '\n';
+          navigator.join();
+        }
 
-      cout<<"Muons Simulated: "<<n_muons<<endl;
-      return 0;
+        /////////////////////////////////////////// Draw ////////////////////////////////////////
+        //TApplication app("app", nullptr, nullptr);
+    
+        TCanvas *c1 = new TCanvas("c1","c1",1200,900); //Create Canvas
+
+        std::cout << "\nAfter Canvas" << '\n';
+    
+        geom->GetTopVolume()->Draw(); //Draw geometry
+        // /D: Track and first level descendents only are drawn
+        // /*: Track and all descendents are drawn
+        geom->DrawTracks("/*"); //Draw tracks
+        
+        c1->SaveAs("Simulation.pdf");
+
+        geom->ClearTracks();
+
+        //app.Run();
+
+        //app.Terminate();
+      }
     }
-  }
 
-  if(argc == 2 && !strcmp(argv[1],"-heatmap")) //Debug mode - Prints information about every photon
-  {
 
-    Generator* gen = new Generator();
+    //std::string filename = path + "/ProjectResults.root";
+    //TFile* outfile = new TFile(filename.c_str(),"UPDATE","ProjectResults");
+    TFile* outfile = new TFile("~/Tafc_Project/ProjectResults.root","UPDATE","ProjectResults");
+    TTree *tree;
 
-    Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen,n_SIPMS,SIPM_size);
+    ////////////////////////////////////////// DISK EFFICIENCY MODE ////////////////////////////////////////////////////
 
-    T->Propagate_Muon();
-    T->Heatmap();
+    if(argc == 2 && !strcmp(argv[1],"-Disk"))
+    {
+
+      double initial_x_muon = 0.;
+      double initial_y_muon = 0.;
+      double detector_efficiency = 0.;
+
+      if(!(outfile->FindKey("DiskEfficiency"))){
+        tree = new TTree("DiskEfficiency","DiskEfficiency");
+        
+        tree->Branch("initial_x_muon",&initial_x_muon,"initial_x_muon/D");
+        tree->Branch("initial_y_muon",&initial_y_muon,"initial_y_muon/D");
+        tree->Branch("detector_efficiency",&detector_efficiency,"detector_efficiency/D");
+        
+      } else {
+        tree = (TTree*)outfile->Get("DiskEfficiency");
+
+        tree->SetBranchAddress("initial_x_muon",&initial_x_muon);
+        tree->SetBranchAddress("initial_y_muon",&initial_y_muon);
+        tree->SetBranchAddress("detector_efficiency",&detector_efficiency);
+      }
+
+      for (int i = 0; i < param.N_threads; i++) {
+        threads.emplace_back(std::thread(DiskEfficiency_Mode, geom, t+i, std::ref(initial_x_muon),
+                              std::ref(initial_y_muon), std::ref(detector_efficiency), tree));
+      }
+
+      //Join threads (wait for all threads to finish before continuing)
+      for (auto &navigator : threads) {
+        navigator.join();
+      }
+
+      if(outfile->FindKey("DiskEfficiency")){
+        std::cout << "\n\nDiskEfficiency TTree updated in ProjectResults.root\n\n";
+        outfile->Delete("DiskEfficiency;1");
+      } else {
+        std::cout << "\n\nDiskEfficiency TTree created in ProjectResults.root\n\n";
+      }
+
+      outfile->Write();
+      outfile->Close();
+
+    }
+
+
+    ////////////////////////////////////////// GEOMETRY ACCEPTANCE EFFICIENCY MODE ////////////////////////////////////////////////////
+
+    if(argc == 2 && !strcmp(argv[1],"-Geo"))
+    {
+
+      if(!(outfile->FindKey("GeomEfficiency"))){
+        tree = new TTree("GeomEfficiency","GeomEfficiency");
+        
+        tree->Branch("distance",&param.Distance,"distance/D");
+        tree->Branch("Nmuons_total",&Nmuons_total,"Nmuons_total/I");
+        tree->Branch("Nmuons_accepted",&param.Nmuons_accepted,"Nmuons_accepted/I");
+
+      } else {
+        tree = (TTree*)outfile->Get("GeomEfficiency");
+
+        tree->SetBranchAddress("distance",&param.Distance);
+        tree->SetBranchAddress("Nmuons_total",&Nmuons_total);
+        tree->SetBranchAddress("Nmuons_accepted",&param.Nmuons_accepted);
+      }
+
+      for (int i = 0; i < param.N_threads; i++){
+        threads.emplace_back(std::thread(GeomEfficiency_Mode, geom, t+i, std::ref(Nmuons_total)));
+      }
+
+      //Join threads (wait for all threads to finish before continuing)
+      for (auto &navigator : threads) {
+        navigator.join();
+      }
+
+      tree->Fill();
+
+      if(outfile->FindKey("GeomEfficiency")){
+        std::cout << "\n\nGeomEfficiency TTree updated in ProjectResults.root\n\n";
+        outfile->Delete("GeomEfficiency;1");
+      } else {
+        std::cout << "\n\nGeomEfficiency TTree created in ProjectResults.root\n\n";
+      }
+      
+      outfile->Write();
+      outfile->Close();
+      
+      /////////////////////////////////////////// Print of Results /////////////////////////////////
+
+      std::cout << "\n\n" << "//////////////////////// FINAL RESULTS ////////////////////////" << "\n\n";
+      std::cout << "Distance between scintillators: " << param.Distance << '\n';
+      std::cout << "Total Muons Generated: " << Nmuons_total << '\n';
+      std::cout << "Total Muons Accepted (Cross both scintillators): " << param.Nmuons_accepted << '\n';
+      std::cout << "Geometrical acceptance: " << 100*(double)param.Nmuons_accepted/Nmuons_total << "% \n\n";
+    }
+
+    ////////////////////////////////////////// DETECTOR EFFICIENCY MODE ////////////////////////////////////////////////////
+
+    if(argc == 3 && !strcmp(argv[1],"-Det"))
+    {
+      int n_scintillator = 0;
+      if(sscanf(argv[2],"%d",&n_scintillator)){
+        std::string name = "DetectorEfficiency" + std::to_string(n_scintillator);
+        
+        if(!(outfile->FindKey(name.c_str()))){
+          tree = new TTree(name.c_str(),name.c_str());
+        
+          tree->Branch("Nphotons_total",&Nphotons_total,"Nphotons_total/I");
+          tree->Branch("Nphotons_detected",&Nphotons_detected,"Nphotons_detected/I");
+          tree->Branch("NSIMPs",&param.n_SIPM,"NSIMPs/I");
+         
+        } else {
+          tree = (TTree*)outfile->Get(name.c_str());
+
+          tree->SetBranchAddress("Nphotons_total",&Nphotons_total);
+          tree->SetBranchAddress("Nphotons_detected",&Nphotons_detected);
+          tree->SetBranchAddress("NSIMPs",&param.n_SIPM);
+        }
+
+        for (int i = 0; i < param.N_threads; i++) {
+          threads.emplace_back(std::thread(DetectionEfficiency_Mode, geom, t+i, std::ref(Nphotons_total),
+                                std::ref(Nphotons_detected), tree, n_scintillator));
+        }
+
+        //Join threads (wait for all threads to finish before continuing)
+        for (auto &navigator : threads) {
+          navigator.join();
+        }
+
+        tree->Fill();
+
+        if(outfile->FindKey(name.c_str())){
+          std::cout << "\n\nDetectorEfficiency" << n_scintillator << " TTree updated in ProjectResults.root\n\n";
+          outfile->Delete((name + ";1").c_str());
+        } else {
+          std::cout << "\n\nDetectorEfficiency" << n_scintillator << " TTree created in ProjectResults.root\n\n";
+        }
+
+        outfile->Write();
+        outfile->Close();
+
+        /////////////////////////////////////////// Print of Results /////////////////////////////////
+
+        std::cout << "\n\n\n" << "//////////////////////// FINAL RESULTS ////////////////////////" << "\n\n";
+        std::cout << "Number of SIPMs per scintillator: " << param.n_SIPM << '\n';
+        std::cout << "Total Photons Generated: " << Nphotons_total << '\n';
+        std::cout << "Photons Detected: " << Nphotons_detected << '\n';
+        std::cout << "Photon Detection efficiency: " << 100*(double)Nphotons_detected/Nphotons_total << "% \n\n";
+      }
+    }
+
+
+    ////////////////////////////////////////// HEAT MAP MODE ////////////////////////////////////////////////////
+
+    if(argc == 2 && !strcmp(argv[1],"-Map"))
+    {
+
+      double photon_z = 0.; //Height of the photon when it hits the scintillator boundary for the first time
+      double photon_phi = 0.; //Phi of the photon when it hits the scintillator boundary for the first time
+
+      if(!(outfile->FindKey("HeatMap"))){
+        tree = new TTree("HeatMap","HeatMap");
+        
+        tree->Branch("photon_z",&photon_z,"photon_z/D");
+        tree->Branch("photon_phi",&photon_phi,"photon_phi/D");
+        
+      } else {
+        tree = (TTree*)outfile->Get("HeatMap");
+
+        tree->SetBranchAddress("photon_z",&photon_z);
+        tree->SetBranchAddress("photon_phi",&photon_phi);
+      }
+
+      for (int i = 0; i < param.N_threads; i++) {
+        threads.emplace_back(std::thread(Heatmap_Mode, geom, t+i, std::ref(photon_phi),
+                              std::ref(photon_z), tree));
+      }
+
+      //Join threads (wait for all threads to finish before continuing)
+      for (auto &navigator : threads) {
+        navigator.join();
+      }
+
+      if(outfile->FindKey("HeatMap")){
+        std::cout << "\n\nHeatMap TTree updated in ProjectResults.root\n\n";
+        outfile->Delete("HeatMap;1");
+      } else {
+        std::cout << "\n\nHeatMap TTree created in ProjectResults.root\n\n";
+      }
+
+      outfile->Write();
+      outfile->Close();
+    }
+
+
+    auto end = std::chrono::high_resolution_clock::now(); //Program end time
+    std::chrono::duration<float> duration = end - start; //Program duration
+
+    std::cout << "Program time: " << duration.count() << "s\n" << std::endl;
+
 
     return 0;
-
-  }
-
-  if(argc == 3 && !strcmp(argv[1],"-draw")) //Draw mode - Single Muon and draw n photons
-  {
-    int n=0;
-    if(sscanf(argv[2],"%d",&n))
-    {
-      Generator* gen = new Generator();
-
-      Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen,n_SIPMS,SIPM_size);
-
-      T->Propagate_Muon();
-      T->Propagate_Photons(n);
-
-      cout<<endl<<"Total Photons Generated: "<<T->GetN_photons()<<endl;
-      cout<<"Photons Absorbed: "<<T->GetN_absorbed()<<endl;
-      cout<<"Photons Detected: "<<T->GetN_detected()<<endl;
-      cout<<"Photons Lost: "<<T->GetN_lost()<<endl;
-
-      auto end = std::chrono::high_resolution_clock::now();
-      std::chrono::duration<float> duration = end - start;
-      std::cout << duration.count() << "s " << std::endl;
-
-
-      TApplication app("app", nullptr, nullptr);
-      T->Draw();
-      app.Run();
-
-
-      return 0;
-    }
-
-  }
-
-  if(argc == 3 && !strcmp(argv[1],"-seed")) //Seed mode - Single Muon with a given seed
-  {
-    int seed=0;
-    if(sscanf(argv[2],"%d",&seed))
-    {
-      Generator* gen = new Generator(seed);
-
-      Tracker* T = new Tracker(radius,height,distance,airgap,althickness,step,gen,n_SIPMS,SIPM_size);
-
-      T->Propagate_Muon();
-      T->Propagate_Photons(T->GetN_photons());
-
-      cout<<endl<<"Total Photons Generated: "<<T->GetN_photons()<<endl;
-      cout<<"Photons Absorbed: "<<T->GetN_absorbed()<<endl;
-      cout<<"Photons Detected: "<<T->GetN_detected()<<endl;
-      cout<<"Photons Lost: "<<T->GetN_lost()<<endl;
-
-      //t1 = time(0);
-      //cout<<"Time elapsed: "<<t1-t0<<" seconds"<<endl;
-      auto end = std::chrono::high_resolution_clock::now();
-      std::chrono::duration<float> duration = end - start;
-      std::cout << duration.count() << "s " << std::endl;
-
-      cout<<"Muons Simulated: "<<1<<endl;
-      return 0;
-    }
-
-  }
-
-  cout<<"Invalid Input"<<endl;
-  return 1;
 }
