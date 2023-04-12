@@ -405,7 +405,7 @@ void Tracker::Propagate_Photons()
 void Tracker::InitializePhotonTrack(int i)
 {
   //Add daughter track (photon track) to the main track and set it the current track
-  current_track =main_track->AddDaughter(i+1,Photons[i]->GetPDG(),Photons[i]);
+  current_track = main_track->AddDaughter(i+1,Photons[i]->GetPDG(),Photons[i]);
   Geo->GetGeoManager()->SetCurrentTrack(current_track); //id is set to i+1 because the main_track already has id=0
   //Add starting position to the track
   current_track->AddPoint(Photons[i]->GetStartingPosition()[0],Photons[i]->GetStartingPosition()[1],Photons[i]->GetStartingPosition()[2],Photons[i]->GetTime());
