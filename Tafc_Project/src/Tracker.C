@@ -550,18 +550,25 @@ double Tracker::GetRefractiveIndex()
   return 0;
 }
 
-bool Tracker::Check_Symmetric_Detector()
+bool Tracker::Check_Symmetric_Detector()//This function returns true if the photon is crossing a detector
 {
-  double h = abs(cpoint[2]);
-
+  double h = abs(cpoint[2]); //First check if the photon's height is with the limits of the detectors heights
   if(h>(0.5*(param.Height+param.Distance+param.SIPM_size)) || h<(0.5*(param.Height+param.Distance-param.SIPM_size))){return false;};
 
-  double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
+  double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]); //Then check if the photon is at the scintillator lateral wall
   if(abs(r-param.Radius)>1e-6){return false;};
 
+  //Now we need to check if the angular component is with the boundaries of the SiPM angular acceptance
+  //Usually we would have to check the condition 2pik /N -alpha < theta < 2pi k/N + alpha , for all  0 <= k <N
+  //However, if we divide everything by 2pi/N we get k - alpha N/2pi < i + delta < k + alpha N/2pi, where we have split (theta N/2pi)
+  //into an integer part i and a real part delta. If we were to loop over all integer k<N, the condition k==i is guaranteed to be true,
+  //because theta < 2pi meaning (theta N/2pi) < N, therefore 0<=i<N.
+  //This means we only to see if abs(delta) > alpha N/2pi  or not. Since i = round(theta N/2pi), then we have
+  //delta = (theta N/2pi) - round((theta N/2pi))
+  
   double theta = tools::PhiAngle(cpoint)/param.SIPM_angle;
-  double delta = theta - round(theta);
-  if(abs(delta) > param.SIPM_alpha){return false;};
+  double delta = theta - round(theta);              //
+  if(abs(delta) > param.SIPM_alpha){return false;}; //SIPM_alpha = alpha(N/2pi)
 
   return true;
 }
