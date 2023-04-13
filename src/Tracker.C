@@ -119,7 +119,7 @@ vector<double> Tracker::GetNormal()
   bool horizontal_reflection =false,vertical_reflection=false;
   vector<double> d = {geom->GetCurrentDirection()[0],geom->GetCurrentDirection()[1],geom->GetCurrentDirection()[2]};
 
-  if(abs(r-Radius) <1e-6 || abs(r-innerradius) <1e-6 || abs(r-outerradius) <1e-6)
+  if(abs(r-Radius) <1e-6 || abs(r-innerradius) <1e-6 || abs(r-outerradius) <1e-6) //If this condition is true, the photon is being reflected by the lateral disk wall
   {
 
     vertical_reflection=true;
@@ -127,6 +127,7 @@ vector<double> Tracker::GetNormal()
     aux[1] = cpoint[1]/r;
     aux[2] = 0;
   }
+  //If this condition is true, the photon is being reflected off of a horizontal scintillator boundary
   if((abs(h-(0.5*Distance+Height))<1e-6) || (abs(h-0.5*Distance)<1e-6) || (abs(h-(Airgap+(0.5*Distance)+Height))<1e-6)  || (abs(h-(-Airgap+(0.5*Distance)))<1e-6) || (abs(h-(Thickness+Airgap+(0.5*Distance)+Height))<1e-6) || (abs(h-(-Thickness-Airgap+(0.5*Distance)))<1e-6)  )
   {
     horizontal_reflection =true;
@@ -134,12 +135,12 @@ vector<double> Tracker::GetNormal()
     aux[1] = 0;
     aux[2] = 1;
   }
-  if(vertical_reflection && horizontal_reflection)// Corner reflection, photon goes back
+  if(vertical_reflection && horizontal_reflection)// If the photon happens to be exactly at the corner of the scintillator it will be reflected both horizontally and vertically
   {
     return d;
   }
 
-  if(tools::Angle_Between_Vectors(aux,d)>M_PI/2)
+  if(tools::Angle_Between_Vectors(aux,d)>M_PI/2) //We define the normal vector to have a positive dot product with the direction vector
   {
     for(int i=0;i<3;i++){aux[i] = -aux[i];};
   }
