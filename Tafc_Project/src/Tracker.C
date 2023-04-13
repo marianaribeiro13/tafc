@@ -45,7 +45,6 @@ Tracker::Tracker(TGeoManager* GeoM, Generator* g, Particle* part)
   cdir = nav->GetCurrentDirection();
 
   Photons_flag = false; // This Flag Checks if the photons have been propagated or not
-  //MainTrackID = 0;      //The ID of the main muon track
   DoubleCross = false;  //This Flag Checks if the muon has crossed both scintillators
 }
 
@@ -56,22 +55,12 @@ Tracker::~Tracker()
   if(Muon){
     delete Muon;
   }
-  //if(!Photons_flag)
-  //{
+
   for(int i =0;i<Photons.size();i++){
     if(Photons[i]){
       delete Photons[i];
     }
   }
-  
-  //if(cpoint){
-    //delete cpoint;
-  //}
-
-  //if(cdir){
-    //delete cdir;
-  //}
-  //}
 }
 
 //Update energy and momentum of the particle after energy loss by BetheBloch equation
@@ -86,7 +75,7 @@ double Tracker::Update_Energy(double step)
 
 //Checks whether the next position (if we make the defined step value in the current particle direction)
 //is in the same node/volume of the current position
-bool Tracker::CheckSameLocation() //Parallel
+bool Tracker::CheckSameLocation()
 {
   double aux[3];
   for(int i=0;i<3;i++)
@@ -426,10 +415,6 @@ void Tracker::Propagate_Photons(int iphoton, int fphoton)
         }
       }
     }
-
-    //delete Photons[i];
-    //std::cout << Photons.size() << '\n';
-
   }
 
   return;
@@ -550,25 +535,18 @@ double Tracker::GetRefractiveIndex()
   return 0;
 }
 
-bool Tracker::Check_Symmetric_Detector()//This function returns true if the photon is crossing a detector
+bool Tracker::Check_Symmetric_Detector()
 {
-  double h = abs(cpoint[2]); //First check if the photon's height is with the limits of the detectors heights
+  double h = abs(cpoint[2]);
+
   if(h>(0.5*(param.Height+param.Distance+param.SIPM_size)) || h<(0.5*(param.Height+param.Distance-param.SIPM_size))){return false;};
 
-  double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]); //Then check if the photon is at the scintillator lateral wall
+  double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
   if(abs(r-param.Radius)>1e-6){return false;};
 
-  //Now we need to check if the angular component is with the boundaries of the SiPM angular acceptance
-  //Usually we would have to check the condition 2pik /N -alpha < theta < 2pi k/N + alpha , for all  0 <= k <N
-  //However, if we divide everything by 2pi/N we get k - alpha N/2pi < i + delta < k + alpha N/2pi, where we have split (theta N/2pi)
-  //into an integer part i and a real part delta. If we were to loop over all integer k<N, the condition k==i is guaranteed to be true,
-  //because theta < 2pi meaning (theta N/2pi) < N, therefore 0<=i<N.
-  //This means we only to see if abs(delta) > alpha N/2pi  or not. Since i = round(theta N/2pi), then we have
-  //delta = (theta N/2pi) - round((theta N/2pi))
-  
   double theta = tools::PhiAngle(cpoint)/param.SIPM_angle;
-  double delta = theta - round(theta);              //
-  if(abs(delta) > param.SIPM_alpha){return false;}; //SIPM_alpha = alpha(N/2pi)
+  double delta = theta - round(theta);
+  if(abs(delta) > param.SIPM_alpha){return false;};
 
   return true;
 }
@@ -613,17 +591,24 @@ double Tracker::BetheBloch(double v){
     return ((qe*qe*qe*qe*n_density*Z*Z*(log((2*me*c*c*v*v)/(I*(1-v*v)))-v*v))/(4*M_PI*eps0*eps0*me*c*c*v*v))/(1.602e-13);
 }
 
+
+//Propagate photons until they reach the lateral disk boundary of a scintillator for the first time and save the height and phi angle positions
 std::vector<std::pair<double,double>> Tracker::PropagatePhotons_To_FirstBoundary(int iphoton, int fphoton)
 {
-  std::vector<std::pair<double,double>> points;
+  std::vector<std::pair<double,double>> points; //vector of pairs to save z and phi
   
+  //loop on photon vector between specified indexes
   for(int i=iphoton; i<fphoton; i++){
 
+    //Setting both initial point and direction and finding the state
     nav->InitTrack(Photons[i]->GetStartingPosition().data(), Photons[i]->GetDirection().data());
+    //Find distance to the next boundary and set step
     nav->FindNextBoundary();
-    nav->Step(kTRUE,kFALSE);
+    //Take step to next boundary but dont cross boundary (second flag is kFALSE)
+    nav->Step(kTRUE,kFALSE); 
     double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
     
+    //check if the photon is near the lateral boundary and save phi and z in vector of pairs
     if(abs(r-param.Radius)<1e-6){
       points.emplace_back(std::make_pair(tools::PhiAngle(cpoint), cpoint[2] - param.Distance/2));
     }
@@ -631,13 +616,3 @@ std::vector<std::pair<double,double>> Tracker::PropagatePhotons_To_FirstBoundary
 
   return points;
 }
-
-
-//Deletes the muon and all the photons, resets the counters and flags and clears all tracks from the geometry
-/*void Tracker::Reset(){
-  
-#ifdef DRAWMODE
-  //geom->ClearTracks();
-  main_track->ResetTrack();
-#endif
-}*/

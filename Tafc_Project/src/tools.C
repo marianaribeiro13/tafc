@@ -3,7 +3,7 @@
 
 tools::~tools(){}
 
-//computes the norm of a vector
+
 double tools::Norm(vector<double> v){
   double n = 0;
   for(int i=0; i < v.size(); i++){
@@ -13,7 +13,6 @@ double tools::Norm(vector<double> v){
   return sqrt(n);
 }
 
-//computes the angle between two vectors
 double tools::Angle_Between_Vectors(vector<double> v1,vector<double> v2){
 
   double dot=0;
@@ -27,7 +26,6 @@ double tools::Angle_Between_Vectors(vector<double> v1,vector<double> v2){
   return acos(dot/sqrt(lenSq1 * lenSq2));
 }
 
-//computes the angle of a refracted vector
 double tools::SnellLaw(double thetai, double n1, double n2){
 
   return asin(n1*sin(thetai)/n2);
@@ -59,7 +57,6 @@ vector<double> tools::Get_Refracted_Dir(vector<double> i, vector<double> n, doub
   return tools::NormalizeVector(aux);
 }
 
-//Normalizes a vector
 vector<double> tools::NormalizeVector(vector<double> v)
 {
   double norm = Norm(v);
@@ -70,7 +67,7 @@ vector<double> tools::NormalizeVector(vector<double> v)
   return v;
 }
 
-//Reads a file into a vector of strings
+
 vector<string> tools::Read_File(string name){
   fstream fp;
   string aux;
@@ -93,7 +90,6 @@ vector<string> tools::Read_File(string name){
   exit(0);
 }
 
-//Reads a file then interpolates the data within, creating and interpolation object that can be called later 
 TSpline3* tools::Interpolate_From_File(string name)
 {
   vector<string> fs = tools::Read_File(name.c_str());
@@ -110,14 +106,13 @@ TSpline3* tools::Interpolate_From_File(string name)
   return I;
 }
 
-//Prints a 3d vector, useful for debugging
+
 void tools::print_vector(const double* v)
 {
   cout<<v[0]<<" "<<v[1]<<" "<<v[2]<<endl;
   return;
 }
 
-//return the angular coordinate of a position
 double tools::PhiAngle(const double *cpoint)
 {
   if(cpoint[0]>0)

@@ -10,14 +10,19 @@
 #include <string>
 #include <chrono>
 #include <thread>
-//#include <filesystem>
+#include <filesystem>
 
 int main(int argc, char* argv[]){
   
     auto start = std::chrono::high_resolution_clock::now(); //Program start time
-    //std::string path = std::filesystem::current_path();
+    std::string path = std::filesystem::current_path();
 
     int t = time(0);
+
+    std::string filename = path + "/HeatMap1.root";
+    TFile* outfile = new TFile(filename.c_str(),"UPDATE","HeatMap1");
+    //TFile* outfile = new TFile("~/Tafc_Project/ProjectFinalResults.root","UPDATE","ProjectFinalResults");
+    TTree *tree;
 
     //unsigned int nthreads = std::thread::hardware_concurrency();
     //std::cout << "Available number of threads: " << nthreads << '\n';
@@ -113,41 +118,36 @@ int main(int argc, char* argv[]){
       }
     }
 
+////////////////////////////////////////// ANGULAR ACCEPTANCE  MODE ////////////////////////////////////////////////////
 
-    //std::string filename = path + "/ProjectResults.root";
-    //TFile* outfile = new TFile(filename.c_str(),"UPDATE","ProjectResults");
-    TFile* outfile = new TFile("~/Tafc_Project/ProjectResults.root","UPDATE","ProjectResults");
-    TTree *tree;
-
-    ////////////////////////////////////////// DISK EFFICIENCY MODE ////////////////////////////////////////////////////
-
-    if(argc == 2 && !strcmp(argv[1],"-Disk"))
-    {
+  if(argc == 2 && !strcmp(argv[1],"-Ang"))
+  {
 
       double initial_x_muon = 0.;
       double initial_y_muon = 0.;
-      double detector_efficiency = 0.;
+      double theta = 0.;
 
-      if(!(outfile->FindKey("DiskEfficiency"))){
-        tree = new TTree("DiskEfficiency","DiskEfficiency");
+      if(!(outfile->FindKey("AngularAcceptance"))){
+        tree = new TTree("AngularAcceptance","AngularAcceptance");
         
+        tree->Branch("distance",&param.Distance,"distance/D");
         tree->Branch("initial_x_muon",&initial_x_muon,"initial_x_muon/D");
         tree->Branch("initial_y_muon",&initial_y_muon,"initial_y_muon/D");
-        tree->Branch("detector_efficiency",&detector_efficiency,"detector_efficiency/D");
-        tree->Branch("NSIMPs",&param.n_SIPM,"NSIMPs/I");
-        
-      } else {
-        tree = (TTree*)outfile->Get("DiskEfficiency");
+        tree->Branch("theta",&theta,"theta/D");
 
+      } else {
+        tree = (TTree*)outfile->Get("AngularAcceptance");
+
+        tree->SetBranchAddress("distance",&param.Distance);
         tree->SetBranchAddress("initial_x_muon",&initial_x_muon);
         tree->SetBranchAddress("initial_y_muon",&initial_y_muon);
-        tree->SetBranchAddress("detector_efficiency",&detector_efficiency);
-        tree->SetBranchAddress("NSIMPs",&param.n_SIPM);
+        tree->SetBranchAddress("theta",&theta);
+       
       }
 
       for (int i = 0; i < param.N_threads; i++) {
-        threads.emplace_back(std::thread(DiskEfficiency_Mode, geom, t+i, std::ref(initial_x_muon),
-                              std::ref(initial_y_muon), std::ref(detector_efficiency), tree));
+        threads.emplace_back(std::thread(AngularAcceptance_Mode, geom, t+i, std::ref(initial_x_muon),
+                              std::ref(initial_y_muon), std::ref(theta), tree));
       }
 
       //Join threads (wait for all threads to finish before continuing)
@@ -155,16 +155,15 @@ int main(int argc, char* argv[]){
         navigator.join();
       }
 
-      if(outfile->FindKey("DiskEfficiency")){
-        std::cout << "\n\nDiskEfficiency TTree updated in ProjectResults.root\n\n";
-        outfile->Delete("DiskEfficiency;1");
+      if(outfile->FindKey("AngularAcceptance")){
+        std::cout << "\n\nAngularAcceptance TTree updated in ProjectResults.root\n\n";
+        outfile->Delete("AngularAcceptance;1");
       } else {
-        std::cout << "\n\nDiskEfficiency TTree created in ProjectResults.root\n\n";
+        std::cout << "\n\nAngularAcceptance TTree created in ProjectResults.root\n\n";
       }
 
       outfile->Write();
       outfile->Close();
-
     }
 
 
@@ -218,6 +217,103 @@ int main(int argc, char* argv[]){
       std::cout << "Geometrical acceptance: " << 100*(double)param.Nmuons_accepted/Nmuons_total << "% \n\n";
     }
 
+
+    ////////////////////////////////////////// HEAT MAP MODE ////////////////////////////////////////////////////
+
+    if(argc == 3 && !strcmp(argv[1],"-Map"))
+    {
+      int n_scintillator = 0;
+      if(sscanf(argv[2],"%d",&n_scintillator)){
+        std::string name = "HeatMap" + std::to_string(n_scintillator);
+
+        double photon_z = 0.; //Height of the photon when it hits the scintillator boundary for the first time
+        double photon_phi = 0.; //Phi of the photon when it hits the scintillator boundary for the first time
+
+        if(!(outfile->FindKey(name.c_str()))){
+          tree = new TTree(name.c_str(),name.c_str());
+        
+          tree->Branch("photon_z",&photon_z,"photon_z/D");
+          tree->Branch("photon_phi",&photon_phi,"photon_phi/D");
+        
+        } else {
+          tree = (TTree*)outfile->Get(name.c_str());
+
+          tree->SetBranchAddress("photon_z",&photon_z);
+          tree->SetBranchAddress("photon_phi",&photon_phi);
+        }
+
+        for (int i = 0; i < param.N_threads; i++) {
+          threads.emplace_back(std::thread(Heatmap_Mode, geom, t+i, std::ref(photon_phi),
+                              std::ref(photon_z), tree, n_scintillator));
+        }
+
+        //Join threads (wait for all threads to finish before continuing)
+        for (auto &navigator : threads) {
+          navigator.join();
+        }
+
+        if(outfile->FindKey(name.c_str())){
+          std::cout << "\n\nHeatMap TTree updated in ProjectResults.root\n\n";
+          outfile->Delete((name + ";1").c_str());
+        } else {
+          std::cout << "\n\nHeatMap TTree created in ProjectResults.root\n\n";
+      }
+
+        outfile->Write();
+        outfile->Close();
+    }
+  }
+
+
+    ////////////////////////////////////////// DISK EFFICIENCY MODE ////////////////////////////////////////////////////
+
+    if(argc == 2 && !strcmp(argv[1],"-Disk"))
+    {
+
+      double initial_x_muon = 0.;
+      double initial_y_muon = 0.;
+      double detector_efficiency = 0.;
+
+      if(!(outfile->FindKey("DiskEfficiency"))){
+        tree = new TTree("DiskEfficiency","DiskEfficiency");
+        
+        tree->Branch("initial_x_muon",&initial_x_muon,"initial_x_muon/D");
+        tree->Branch("initial_y_muon",&initial_y_muon,"initial_y_muon/D");
+        tree->Branch("detector_efficiency",&detector_efficiency,"detector_efficiency/D");
+        tree->Branch("NSIMPs",&param.n_SIPM,"NSIMPs/I");
+        
+      } else {
+        tree = (TTree*)outfile->Get("DiskEfficiency");
+
+        tree->SetBranchAddress("initial_x_muon",&initial_x_muon);
+        tree->SetBranchAddress("initial_y_muon",&initial_y_muon);
+        tree->SetBranchAddress("detector_efficiency",&detector_efficiency);
+        tree->SetBranchAddress("NSIMPs",&param.n_SIPM);
+      }
+
+      for (int i = 0; i < param.N_threads; i++) {
+        threads.emplace_back(std::thread(DiskEfficiency_Mode, geom, t+i, std::ref(initial_x_muon),
+                              std::ref(initial_y_muon), std::ref(detector_efficiency), tree));
+      }
+
+      //Join threads (wait for all threads to finish before continuing)
+      for (auto &navigator : threads) {
+        navigator.join();
+      }
+
+      if(outfile->FindKey("DiskEfficiency")){
+        std::cout << "\n\nDiskEfficiency TTree updated in ProjectResults.root\n\n";
+        outfile->Delete("DiskEfficiency;1");
+      } else {
+        std::cout << "\n\nDiskEfficiency TTree created in ProjectResults.root\n\n";
+      }
+
+      outfile->Write();
+      outfile->Close();
+
+    }
+
+    
     ////////////////////////////////////////// DETECTOR EFFICIENCY MODE ////////////////////////////////////////////////////
 
     if(argc == 3 && !strcmp(argv[1],"-Det"))
@@ -277,48 +373,64 @@ int main(int argc, char* argv[]){
     }
 
 
-    ////////////////////////////////////////// HEAT MAP MODE ////////////////////////////////////////////////////
+    
+    ////////////////////////////////////////// ONE SIPM EFFICIENCY MODE ////////////////////////////////////////////////////
 
-    if(argc == 2 && !strcmp(argv[1],"-Map"))
+    if(argc == 3 && !strcmp(argv[1],"-One"))
     {
-
-      double photon_z = 0.; //Height of the photon when it hits the scintillator boundary for the first time
-      double photon_phi = 0.; //Phi of the photon when it hits the scintillator boundary for the first time
-
-      if(!(outfile->FindKey("HeatMap"))){
-        tree = new TTree("HeatMap","HeatMap");
+      double angle = param.SIPM_angles[0];
+      int n_scintillator = 0;
+      if(sscanf(argv[2],"%d",&n_scintillator)){
+        std::string name = "OneSIPMEfficiency" + std::to_string(n_scintillator);
         
-        tree->Branch("Nmuons_accepted",&param.Nmuons_accepted,"Nmuons_accepted/I");
-        tree->Branch("photon_z",&photon_z,"photon_z/D");
-        tree->Branch("photon_phi",&photon_phi,"photon_phi/D");
+        if(!(outfile->FindKey(name.c_str()))){
+          tree = new TTree(name.c_str(),name.c_str());
         
-      } else {
-        tree = (TTree*)outfile->Get("HeatMap");
+          tree->Branch("Nmuons_accepted",&param.Nmuons_accepted,"Nmuons_accepted/I");
+          tree->Branch("Nphotons_total",&Nphotons_total,"Nphotons_total/I");
+          tree->Branch("Nphotons_detected",&Nphotons_detected,"Nphotons_detected/I");
+          tree->Branch("SIPM_angle",&angle,"SIPM_angle/D");
+         
+        } else {
+          tree = (TTree*)outfile->Get(name.c_str());
 
-        tree->SetBranchAddress("Nmuons_accepted",&param.Nmuons_accepted);
-        tree->SetBranchAddress("photon_z",&photon_z);
-        tree->SetBranchAddress("photon_phi",&photon_phi);
+          tree->SetBranchAddress("Nmuons_accepted",&param.Nmuons_accepted);
+          tree->SetBranchAddress("Nphotons_total",&Nphotons_total);
+          tree->SetBranchAddress("Nphotons_detected",&Nphotons_detected);
+          tree->SetBranchAddress("SIPM_angle",&angle);
+        }
+
+        for (int i = 0; i < param.N_threads; i++) {
+          threads.emplace_back(std::thread(DetectionEfficiency_Mode, geom, t+i, std::ref(Nphotons_total),
+                                std::ref(Nphotons_detected), tree, n_scintillator));
+        }
+
+        //Join threads (wait for all threads to finish before continuing)
+        for (auto &navigator : threads) {
+          navigator.join();
+        }
+
+        tree->Fill();
+
+        if(outfile->FindKey(name.c_str())){
+          std::cout << "\n\nOneSIPMEfficiency" << n_scintillator << " TTree updated in ProjectResults.root\n\n";
+          outfile->Delete((name + ";1").c_str());
+        } else {
+          std::cout << "\n\nOneSIPMEfficiency" << n_scintillator << " TTree created in ProjectResults.root\n\n";
+        }
+
+        outfile->Write();
+        outfile->Close();
+
+        /////////////////////////////////////////// Print of Results /////////////////////////////////
+
+        std::cout << "\n\n\n" << "//////////////////////// FINAL RESULTS ////////////////////////" << "\n\n";
+        std::cout << "Total Muons Accepted (Cross both scintillators): " << param.Nmuons_accepted << '\n';
+        std::cout << "Angle of SIPM: " << param.n_SIPM << '\n';
+        std::cout << "Total Photons Generated: " << Nphotons_total << '\n';
+        std::cout << "Photons Detected: " << Nphotons_detected << '\n';
+        std::cout << "Photon Detection efficiency: " << 100*(double)Nphotons_detected/Nphotons_total << "% \n\n";
       }
-
-      for (int i = 0; i < param.N_threads; i++) {
-        threads.emplace_back(std::thread(Heatmap_Mode, geom, t+i, std::ref(photon_phi),
-                              std::ref(photon_z), tree));
-      }
-
-      //Join threads (wait for all threads to finish before continuing)
-      for (auto &navigator : threads) {
-        navigator.join();
-      }
-
-      if(outfile->FindKey("HeatMap")){
-        std::cout << "\n\nHeatMap TTree updated in ProjectResults.root\n\n";
-        outfile->Delete("HeatMap;1");
-      } else {
-        std::cout << "\n\nHeatMap TTree created in ProjectResults.root\n\n";
-      }
-
-      outfile->Write();
-      outfile->Close();
     }
 
 

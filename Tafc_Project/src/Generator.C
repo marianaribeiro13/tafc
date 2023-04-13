@@ -67,6 +67,11 @@ vector<double> Generator::Generate_Direction_From_Theta(double theta) {
   return d;
 }
 
+double Generator::Generate_Angle(){
+
+  return Random->Uniform(-M_PI, M_PI);
+}
+
 double Generator::Random_Distribution(double xmin,double xmax,TF1 *F){
 
   double x = Random->Uniform(xmin,xmax);

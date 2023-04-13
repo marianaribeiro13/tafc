@@ -10,6 +10,7 @@ public:
   Generator();
   Generator(int);
   vector<double> Generate_Vector(); //creates a random, normalized 3d vector
+  double Generate_Angle(); //Generate angle between -M_PI and M_PI
   vector<double> Generate_Direction_From_Theta(double theta); //creates a random, normalized 3d vector, given the angle with the z axis
   double Random_Distribution(double ,double ,TF1* ); //generates a random number according to a distribution
   vector<double> Generate_Position(double,double,double); //Generates a muon's starting position
