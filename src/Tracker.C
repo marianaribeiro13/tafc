@@ -1,65 +1,76 @@
 #include "Tracker.h"
+#include <mutex>
 
-///////////////////////////// Constructor //////////////////////////////
+//#define DRAWMODE
 
-Tracker::Tracker(double radius, double height, double distance, double airgap, double althickness, double step, Generator* g, int n_SIPMS,double SIPM_size)
-: Geometry(), stepvalue(step), N_photons(0),N_absorbed(0),N_detected(0),N_lost(0),DoubleCross(false)
+#ifdef DRAWMODE
+std::mutex Mutex;
+#endif 
+///////////////////////////// Constructer //////////////////////////////
+
+Tracker::Tracker(TGeoManager* GeoM, Generator* g, Particle* part)
+: N_photons(0), N_absorbed(0),N_detected(0), N_photons1(0), N_lost(0), DoubleCross(false)
 {
-  generator = g;
+  stepvalue = param.step;
 
-  //Build the Telescope Geometry
-  Build_MuonTelescope(radius, height, distance, airgap, althickness,n_SIPMS,SIPM_size);
+  geom = GeoM; //Assign pointer to TGeoManager object
+  generator = g; //Assign pointer to Generator object
+  Muon = part; //Assign pointer to Particle object
+  main_track = nullptr; //Just in case draw mode is not defined (not sure if this should be done)
 
-  //Generate Cosmic Muon at incident scintillator plane
-  Muon = generator->Generate_CosmicMuon(generator->Generate_Position(Distance,Height,Radius));
+  //The functions for adding navigators have a lock inside (they are thread safe)
+  //Get the current navigator for this thread (if it was already added 
+  //- happens if we create more than one Tracker object in the same thread)
+  nav = geom->GetCurrentNavigator(); 
+  if (!nav) nav = geom->AddNavigator();
 
-  //BetheBloch lambda function
-  auto f = [](double *x,double *par)
-  {
-    int Z=-1;
-    double c = 299792458;
-    double mp = 1.672621637e-27;
-    double me = 9.1093821499999992e-31;
-    double qe = 1.602176487e-19;
-    double na = 6.02214179e23;
-    double eps0 = 8.854187817e-12;
-    double n_density=3.33e29; // per m^3
-    double I = 1.03660828e-17;
-    return ((qe*qe*qe*qe*n_density*Z*Z*(log((2*me*c*c*x[0]*x[0])/(I*(1-x[0]*x[0])))-x[0]*x[0]))/(4*M_PI*eps0*eps0*me*c*c*x[0]*x[0]))/(1.602e-13);
-  };
-  BetheBloch = new TF1("f",f); //Create BetheBloch TF1
-
+#ifdef DRAWMODE
+  Mutex.lock();
   //Add muon track to the Navigator and assign it to main_track atribute
-  geom->AddTrack(0,Muon->GetPDG(),Muon);
-  main_track = geom->GetTrack(0);
+  int track_index = geom->AddTrack(0,Muon->GetPDG(),Muon); //The first argument is not important
 
+  main_track = geom->GetTrack(track_index); //Get muon track
   //Add starting point to the track (initial position of the muon) and set main_track as the current track
   main_track->AddPoint(Muon->GetStartingPosition()[0],Muon->GetStartingPosition()[1],Muon->GetStartingPosition()[2],0);
-  geom->SetCurrentTrack(0);
+  geom->SetCurrentTrack(track_index);
+  Mutex.unlock();
+ 
+#endif
+  
+  //Get pointer to current position (Whenever we update the position cpoint is updated, 
+  //since it is equal to the nav pointer to the current position)
+  cpoint = nav->GetCurrentPoint(); 
+  //Get pointer to current direction (Whenever we update the direction cdir is updated, 
+  //since it is equal to the nav pointer to the current direction)
+  cdir = nav->GetCurrentDirection();
 
-  //Setting both initial point and direction and finding the state
-  geom->InitTrack(geom->GetCurrentTrack()->GetFirstPoint(), Muon->GetDirection().data());
-
-  //Get pointer to current position (Whenever we update the position cpoint is updated,
-  //since it is equal to the geom pointer to the current position)
-  cpoint = geom->GetCurrentPoint();
+  Photons_flag = false; // This Flag Checks if the photons have been propagated or not
+  DoubleCross = false;  //This Flag Checks if the muon has crossed both scintillators
 }
 
 ///////////////////////////////// Destructor ///////////////////////////////////
 
 Tracker::~Tracker()
 {
+  if(Muon){
+    delete Muon;
+  }
 
-  delete Muon;
+  for(int i =0;i<Photons.size();i++){
+    if(Photons[i]){
+      delete Photons[i];
+    }
+  }
 }
 
 //Update energy and momentum of the particle after energy loss by BetheBloch equation
 double Tracker::Update_Energy(double step)
 {
-  double dE = BetheBloch->Eval(Muon->GetVelocity()) * (step/100); //step converted from cm to m
+  double dE = BetheBloch(Muon->GetVelocity()) * (step/100); //step converted from cm to m
   Muon->ChangeEnergy(Muon->GetEnergy()-dE); //Update energy
   Muon->ChangeMomentum(Muon->CalculateMomentum(Muon->GetEnergy())); //Update momentum
   return dE;
+
 }
 
 //Checks whether the next position (if we make the defined step value in the current particle direction)
@@ -71,7 +82,7 @@ bool Tracker::CheckSameLocation()
   {
     aux[i] = cpoint[i] + stepvalue*Muon->GetDirection()[i];
   }
-  return geom->IsSameLocation(aux[0],aux[1],aux[2]);
+  return nav->IsSameLocation(aux[0],aux[1],aux[2]);
 }
 
 //Calculate probability of reflection at boundary
@@ -117,9 +128,10 @@ vector<double> Tracker::GetNormal()
   double h = abs(cpoint[2]);
   vector<double> aux(3);
   bool horizontal_reflection =false,vertical_reflection=false;
-  vector<double> d = {geom->GetCurrentDirection()[0],geom->GetCurrentDirection()[1],geom->GetCurrentDirection()[2]};
+  vector<double> d = {cdir[0], cdir[1], cdir[2]};
+  //vector<double> d = {nav->GetCurrentDirection()[0],nav->GetCurrentDirection()[1],nav->GetCurrentDirection()[2]};
 
-  if(abs(r-Radius) <1e-6 || abs(r-innerradius) <1e-6 || abs(r-outerradius) <1e-6) //If this condition is true, the photon is being reflected by the lateral disk wall
+  if(abs(r-param.Radius) <1e-6 || abs(r-param.innerradius) <1e-6 || abs(r-param.outerradius) <1e-6)
   {
 
     vertical_reflection=true;
@@ -127,20 +139,19 @@ vector<double> Tracker::GetNormal()
     aux[1] = cpoint[1]/r;
     aux[2] = 0;
   }
-  //If this condition is true, the photon is being reflected off of a horizontal scintillator boundary
-  if((abs(h-(0.5*Distance+Height))<1e-6) || (abs(h-0.5*Distance)<1e-6) || (abs(h-(Airgap+(0.5*Distance)+Height))<1e-6)  || (abs(h-(-Airgap+(0.5*Distance)))<1e-6) || (abs(h-(Thickness+Airgap+(0.5*Distance)+Height))<1e-6) || (abs(h-(-Thickness-Airgap+(0.5*Distance)))<1e-6)  )
+  if((abs(h-(0.5*param.Distance+param.Height))<1e-6) || (abs(h-0.5*param.Distance)<1e-6) || (abs(h-(param.Airgap+(0.5*param.Distance)+param.Height))<1e-6)  || (abs(h-(-param.Airgap+(0.5*param.Distance)))<1e-6) || (abs(h-(param.Thickness+param.Airgap+(0.5*param.Distance)+param.Height))<1e-6) || (abs(h-(-param.Thickness-param.Airgap+(0.5*param.Distance)))<1e-6) )
   {
     horizontal_reflection =true;
     aux[0] = 0;
     aux[1] = 0;
     aux[2] = 1;
   }
-  if(vertical_reflection && horizontal_reflection)// If the photon happens to be exactly at the corner of the scintillator it will be reflected both horizontally and vertically
+  if(vertical_reflection && horizontal_reflection)// Corner reflection, photon goes back
   {
     return d;
   }
 
-  if(tools::Angle_Between_Vectors(aux,d)>M_PI/2) //We define the normal vector to have a positive dot product with the direction vector
+  if(tools::Angle_Between_Vectors(aux,d)>M_PI/2)
   {
     for(int i=0;i<3;i++){aux[i] = -aux[i];};
   }
@@ -151,33 +162,49 @@ vector<double> Tracker::GetNormal()
 //Check if the particle is in vacuum near the scintillator boundary
 bool Tracker::VacuumToPlastic(double r)
 {
+  double h = abs(abs(cpoint[2])-0.5*(param.Distance+param.Height));
   //If the particle is in vacuum (in the air gap) and near the lateral scintillator boundary
   //or near one of the flat scintillator boundaries
-  if(CheckDensity()==0 && ((abs(r-Radius) < 1e-6) || (abs(abs(cpoint[2])-(0.5*Distance+Height))<1e-6)
-  || (abs(abs(cpoint[2])-(0.5*Distance))<1e-6))){return true;};
+  if(((abs(r-param.Radius) < 1e-6) || abs(h-(param.Height/2))<1e-6)){return true;};
 
   return false;
+
+  
 }
 
 //Check if the particle is in vacuum near aluminium foil
 bool Tracker::VacuumToAluminium(double r)
 {
+  double h = abs(abs(cpoint[2])-0.5*(param.Distance+param.Height));
   //If the particle is in vacuum (either in the air gap or outside the telescope) and near any aluminium foil boundary
-  if(CheckDensity()==0 && ((abs(r-innerradius) < 1e-6) || (abs(r-outerradius) <1e-6)
-  || (abs(abs(cpoint[2])-(Airgap+0.5*Distance+Height))<1e-6) || (abs(abs(cpoint[2])-(-Airgap+(0.5*Distance)))<1e-6)
-  || (abs(abs(cpoint[2])-(Thickness+Airgap+0.5*Distance+Height))<1e-6) || (abs(abs(cpoint[2])-(-Thickness-Airgap+(0.5*Distance)))<1e-6) ) )
-  {return true;};
+  if(((abs(r-param.innerradius) < 1e-6) || (abs(r-param.outerradius) <1e-6) || abs(h-(param.Height/2+param.Airgap))<1e-6 )){return true;};
 
   return false;
 }
 
 //Check if photon is in the detector region and if it is detected according to the detector efficiency
-bool Tracker::DetectionCheck(const double *cpoint,double e)
+bool Tracker::DetectionCheck(double e)
 {
-  if(Check_Symmetric_Detector(cpoint) && generator->Uniform(0,1)<generator->GetDetector_Efficiency()->Eval(e))
+
+  if(Check_Symmetric_Detector() && generator->Uniform(0,1)<generator->GetDetector_Efficiency()->Eval(e))
   {
+
     return true;
   }
+
+  return false;
+}
+
+//Check if photon is in the detector region and if it is detected according to the detector efficiency
+bool Tracker::Is_Photon_Detected(double E)
+{
+
+  if(Is_Detector_Region() && generator->Uniform(0,1)<generator->GetDetector_Efficiency()->Eval(E))
+  {
+
+    return true;
+  }
+
   return false;
 }
 
@@ -190,10 +217,14 @@ bool Tracker::DetectionCheck(const double *cpoint,double e)
 
 void Tracker::Propagate_Muon()
 {
+  
   //Variable that stores the number of times the particle crosses a scintillator
-  int scintillator_cross=0;
+  int scintillator_cross=0; 
 
-  while(!geom->IsOutside()) //While the particle is inside the defined top volume
+  //Setting both initial point and direction and finding the state
+  nav->InitTrack(Muon->GetStartingPosition().data(), Muon->GetDirection().data());
+
+  while(!nav->IsOutside()) //While the particle is inside the defined top volume
   {
     if(CheckDensity()==0) //Particle is in vacuum
     {
@@ -203,24 +234,41 @@ void Tracker::Propagate_Muon()
     {
       scintillator_cross++; //Plus one scintillator crossed
       Muon_Scintillator_Step();
+      if(scintillator_cross == 1){
+        N_photons1 = N_photons;
+      }
     }
     if(CheckDensity()==2.7) //Particle is in the aluminium foil
     {
       Muon_Aluminium_Step();
     }
-    if(scintillator_cross == 2){DoubleCross=true;}; //The particle crosses both scintillators
-
   }
+
+  if(scintillator_cross < 2){ //The particle crosses both scintillators
+#ifdef DRAWMODE
+    Mutex.lock();
+    //geom->ClearTracks();
+    main_track->ResetTrack();
+    Mutex.unlock();
+#endif
+  }else { 
+    DoubleCross=true;
+  }
+
   return;
 }
 
 //Make vacuum step
 void Tracker::Muon_Vacuum_Step()
 {
-  geom->FindNextBoundaryAndStep(); //Make step to the next boundary and cross it (updates current position of the navigator)
-  Muon->IncreaseTime(geom->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
+  nav->FindNextBoundaryAndStep(); //Make step to the next boundary and cross it (updates current position of the navigator)
   Muon->ChangePosition(cpoint); //Update muon object position
-  geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
+#ifdef DRAWMODE
+  Mutex.lock();
+  Muon->IncreaseTime(nav->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
+  main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
+  Mutex.unlock();
+#endif
   return;
 }
 
@@ -228,15 +276,18 @@ void Tracker::Muon_Vacuum_Step()
 void Tracker::Muon_Scintillator_Step()
 {
   //Set next step to the defined arbitrary step value (defined by the constructer)
-  geom->SetStep(stepvalue);
+  nav->SetStep(stepvalue);
   while(CheckSameLocation())
   {
     //Execute step defined by SetStep (flag = kFALSE means it is an arbitrary step, not limited by geometrical reasons)
-    geom->Step(kFALSE); //Updates the current position of the navigator
-    Muon->IncreaseTime(stepvalue/(Muon->GetVelocity()*2.998e10)); //Update time
+    nav->Step(kFALSE); //Updates the current position of the navigator
     Muon->ChangePosition(cpoint); //Update muon object position
-    geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
-
+#ifdef DRAWMODE
+    Mutex.lock();
+    Muon->IncreaseTime(stepvalue/(Muon->GetVelocity()*2.998e10)); //Update time
+    main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
+    Mutex.unlock();
+#endif
     //Get number of photons from Poisson distribution (usually approximatly 1 photon per 100 eV for common scintillators)
     int n = generator->Generate_Photon_Number(10000*Update_Energy(stepvalue)); //Energy is converted to MeV
     N_photons+=n; //Update total number of emited photons
@@ -244,24 +295,27 @@ void Tracker::Muon_Scintillator_Step()
     for(int i=0;i<n;i++)
     {
       //Add generated photon according to Scintillator spectrum to the vector of photons (to propagate later)
-      Photons.push_back(generator->Generate_Photon(Muon->GetPosition()));
+      Photons.emplace_back(generator->Generate_Photon(Muon->GetPosition())); 
       Photons[i]->IncreaseTime(Muon->GetTime()); //Assign current time to the photon
     }
   }
 
-  geom->FindNextBoundaryAndStep(stepvalue); //Make step to the next boundary and cross it (step is less than the defined step)
-  Muon->IncreaseTime(geom->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
+  nav->FindNextBoundaryAndStep(stepvalue); //Make step to the next boundary and cross it (step is less than the defined step)
   Muon->ChangePosition(cpoint); //Update muon object position
-  geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
-
+#ifdef DRAWMODE
+  Mutex.lock();
+  Muon->IncreaseTime(nav->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
+  main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
+  Mutex.unlock();
+#endif
   //Get number of photons from Poisson distribution (usually approximatly 1 photon per 100 eV for common scintillators)
-  int n = generator->Generate_Photon_Number(10000*Update_Energy(geom->GetStep()));
+  int n = generator->Generate_Photon_Number(10000*Update_Energy(nav->GetStep()));
   N_photons+=n; //Update total number of emited photons
 
   for(int i=0;i<n;i++)
   {
     //Add generated photon according to Scintillator spectrum to the vector of photons (to propagate later)
-    Photons.push_back(generator->Generate_Photon(Muon->GetPosition()));
+    Photons.emplace_back(generator->Generate_Photon(Muon->GetPosition()));
     Photons[i]->IncreaseTime(Muon->GetTime()); //Assign current time to the photon
   }
 
@@ -271,10 +325,14 @@ void Tracker::Muon_Scintillator_Step()
 //Make aluminium step
 void Tracker::Muon_Aluminium_Step()
 {
-  geom->FindNextBoundaryAndStep(); //Make step to the next boundary and cross it (updates current position of the navigator)
-  Muon->IncreaseTime(geom->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
+  nav->FindNextBoundaryAndStep(); //Make step to the next boundary and cross it (updates current position of the navigator)
   Muon->ChangePosition(cpoint); //Update muon object position
-  geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
+#ifdef DRAWMODE
+  Mutex.lock();
+  Muon->IncreaseTime(nav->GetStep()/(Muon->GetVelocity()*2.998e10)); //Update time
+  main_track->AddPoint(cpoint[0],cpoint[1],cpoint[2],Muon->GetTime()); //Add new point to the current track
+  Mutex.unlock();
+#endif
   return;
 }
 
@@ -284,16 +342,21 @@ void Tracker::Muon_Aluminium_Step()
 //////////Photon Propagators//////////
 //////////Photon Propagators//////////
 
-void Tracker::Propagate_Photons(int n)
+void Tracker::Propagate_Photons(int iphoton, int fphoton)
 {
-  int m = N_photons/n;
+  Photons_flag = true;
 
-  for(int j=0;j<n;j++)
+  //int m = N_photons/n;
+  for(int i=iphoton; i<fphoton;i++)
   {
-    int i=m*j;
+    //int i=m*j;
+    nav->InitTrack(Photons[i]->GetStartingPosition().data(), Photons[i]->GetDirection().data());
+#ifdef DRAWMODE
+    //Mutex.lock();
     InitializePhotonTrack(i);
-
-    //Generate random step according to the probability of absorption of the photon
+    //Mutex.unlock();
+#endif
+    //Generate random step according to the probability of absorption of the photon 
     //(the distance the photon goes through in the material before being absorbed)
     double absorption_step = generator->Generate_Photon_Step();
     double total_dist = 0; //Distance traveled by the photon in the material
@@ -301,32 +364,31 @@ void Tracker::Propagate_Photons(int n)
     while(true)
     {
       //Find distance to the next boundary and set step
-      geom->FindNextBoundary();
+      nav->FindNextBoundary();
 
       if(CheckDensity()==1.023) //Photon is in scintillator
       {
-
-        //If the absorption distance generated (minus the already travelled distance in this material) is shorter than the distance to the next boundary,
+        
+        //If the absorption distance generated (minus the already travelled distance in this material) is shorter than the distance to the next boundary, 
         //the photon is propagated until the point of absorption
-        if((absorption_step - total_dist) < geom->GetStep())
+        if((absorption_step - total_dist) < nav->GetStep())
         {
-          geom->SetStep(absorption_step-total_dist);
+          nav->SetStep(absorption_step-total_dist);
           //Execute step (flag = kFALSE means it is an arbitrary step, not limited by geometrical reasons)
-          geom->Step(kFALSE);
-          Update_Photon_Track(i);
-
+          nav->Step(kFALSE);
+          Update_Photon(i);
           N_absorbed++;
           break;
         } else {
           //Take step to next boundary but dont cross boundary (second flag is kFALSE)
-          geom->Step(kTRUE, kFALSE);
-          total_dist+=geom->GetStep();
-          Update_Photon_Track(i);
+          nav->Step(kTRUE, kFALSE);
+          total_dist += nav->GetStep();
+          Update_Photon(i);
 
           Photon_Scintillator_Reflection_Check(i);
         }
 
-        if(DetectionCheck(cpoint,Photons[i]->GetEnergy()))
+        if(DetectionCheck(Photons[i]->GetEnergy())) //Check if photon is detected
         {
           N_detected++;
           break;
@@ -337,8 +399,8 @@ void Tracker::Propagate_Photons(int n)
         if(CheckDensity()==0) //Photon is in vacuum (or air gap)
         {
           //Take step to next boundary but dont cross boundary (second flag is kFALSE)
-          geom->Step(kTRUE, kFALSE);
-          Update_Photon_Track(i);
+          nav->Step(kTRUE, kFALSE);
+          Update_Photon(i);
 
           if(!Photon_Vacuum_Reflection_Check(i)) //Photon is absorbed in the aluminium
           {
@@ -353,10 +415,6 @@ void Tracker::Propagate_Photons(int n)
         }
       }
     }
-
-    delete Photons[i];
-    //if(geom->IsOutside()){N_lost++;};
-
   }
 
   return;
@@ -364,14 +422,14 @@ void Tracker::Propagate_Photons(int n)
 
 void Tracker::InitializePhotonTrack(int i)
 {
-
+#ifdef DRAWMODE
+  //Mutex.lock();
   //Add daughter track (photon track) to the main track and set it the current track
-  geom->SetCurrentTrack(main_track->AddDaughter(i+1,Photons[i]->GetPDG(),Photons[i])); //id is set to i+1 because the main_track already has id=0
+  geom->SetCurrentTrack(main_track->AddDaughter(i,Photons[i]->GetPDG(),Photons[i])); //the first argument is not important
   //Add starting position to the track
   geom->GetCurrentTrack()->AddPoint(Photons[i]->GetStartingPosition()[0],Photons[i]->GetStartingPosition()[1],Photons[i]->GetStartingPosition()[2],Photons[i]->GetTime());
-  //Setting both initial point and direction and finding the state
-  geom->InitTrack(geom->GetCurrentTrack()->GetFirstPoint(), Photons[i]->GetDirection().data());
-  //geom->SetCurrentPoint(Photons[i]->GetStartingPosition().data());
+  //Mutex.unlock();
+#endif
   return;
 }
 
@@ -380,19 +438,19 @@ void Tracker::Photon_Scintillator_Reflection_Check(int i)
 {
   vector<double> n = GetNormal(); //Get normal to the next boundary
   double theta = tools::Angle_Between_Vectors(Photons[i]->GetDirection(),n); //Compute incident angle
-
-  if(CheckReflection(theta,1.58,1)) //Photon is reflected
+  
+  if(CheckReflection(theta,1.58,1)) //Photon is reflected 
   {
     vector<double> ndir = tools::Get_Reflected_Dir(Photons[i]->GetDirection(),n); //Get reflected direction
-    geom->SetCurrentDirection(ndir.data()); //Set reflected direction the new direction
+    nav->SetCurrentDirection(ndir.data()); //Set reflected direction the new direction
     Photons[i]->ChangeDirection(ndir); //Update photon object direction
 
   }else //Photon is transmited
   {
     vector<double> ndir = tools::Get_Refracted_Dir(Photons[i]->GetDirection(),n,theta,1.58,1); //Get refracted direction
-    geom->FindNextBoundaryAndStep(); //Cross the boundary
-    Update_Photon_Track(i);
-    geom->SetCurrentDirection(ndir.data()); //Set refracted direction the new direction
+    nav->FindNextBoundaryAndStep(); //Cross the boundary
+    Update_Photon(i);
+    nav->SetCurrentDirection(ndir.data()); //Set refracted direction the new direction
     Photons[i]->ChangeDirection(ndir); //Update photon object direction
 
   }
@@ -405,21 +463,21 @@ bool Tracker::Photon_Vacuum_Reflection_Check(int i)
   vector<double> n = GetNormal(); //Get normal to the next boundary
   double theta = tools::Angle_Between_Vectors(Photons[i]->GetDirection(),n); //Compute incident angle
   double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]); //Compute radial distance
-
+  
   if(VacuumToPlastic(r)) //Photon is in the air gap near the boundary of the scintillator
   {
     if(CheckReflection(theta,1,1.58)) //Photon is reflected
     {
       vector<double> ndir = tools::Get_Reflected_Dir(Photons[i]->GetDirection(),n); //Get reflected direction
-      geom->SetCurrentDirection(ndir.data()); //Set reflected direction the new direction
+      nav->SetCurrentDirection(ndir.data()); //Set reflected direction the new direction
       Photons[i]->ChangeDirection(ndir); //Update photon object direction
-
+    
     }else //Photon is transmited
     {
       vector<double> ndir = tools::Get_Refracted_Dir(Photons[i]->GetDirection(),n,theta,1,1.58); //Get refracted direction
-      geom->FindNextBoundaryAndStep(); //Cross the boundary
-      Update_Photon_Track(i);
-      geom->SetCurrentDirection(ndir.data()); //Set refracted direction the new direction
+      nav->FindNextBoundaryAndStep(); //Cross the boundary
+      Update_Photon(i);
+      nav->SetCurrentDirection(ndir.data()); //Set refracted direction the new direction
       Photons[i]->ChangeDirection(ndir); //Update photon object direction
     }
 
@@ -430,7 +488,7 @@ bool Tracker::Photon_Vacuum_Reflection_Check(int i)
       if(generator->Uniform(0,1) < .92) //Photon is reflected in the aluminium foil (with a probability of 92% for the relevant wavelengths)
       {
         vector<double> ndir = tools::Get_Reflected_Dir(Photons[i]->GetDirection(),n); //Get reflected direction
-        geom->SetCurrentDirection(ndir.data()); //Set reflected direction the new direction
+        nav->SetCurrentDirection(ndir.data()); //Set reflected direction the new direction
         Photons[i]->ChangeDirection(ndir); //Update photon object direction
         return true;
       } else{ //Photon is absorbed in the aluminium foil
@@ -445,60 +503,116 @@ bool Tracker::Photon_Vacuum_Reflection_Check(int i)
   return true;
 }
 
-void Tracker::Update_Photon_Track(int i){
+void Tracker::Update_Photon(int i){
 
-  Photons[i]->IncreaseTime(GetRefractiveIndex()*geom->GetStep()/(2.998e10)); //Update time
   Photons[i]->ChangePosition(cpoint); //Update photon object position
+#ifdef DRAWMODE
+  //Mutex.lock();
+  Photons[i]->IncreaseTime(GetRefractiveIndex()*nav->GetStep()/(2.998e10)); //Update time
   geom->GetCurrentTrack()->AddPoint(cpoint[0],cpoint[1],cpoint[2],Photons[i]->GetTime()); //Add new position to the track
-
+  //Mutex.unlock();
+#endif
 }
 
-//////////Draw Mode/////////
-//////////Draw Mode/////////
-//////////Draw Mode/////////
-//////////Draw Mode/////////
-//////////Draw Mode/////////
-
-//Draw geometry and tracks
-void Tracker::Draw(){
-  //Create Canvas
-  TCanvas *c1 = new TCanvas("c1","c1",1200,900);
-
-  geom->GetTopVolume()->Draw(); //Draw geometry
-  // /D: Track and first level descendents only are drawn
-  // /*: Track and all descendents are drawn
-  geom->DrawTracks("/*"); //Draw tracks
-}
-
-void Tracker::Heatmap()
+double Tracker::CheckDensity()
 {
-  vector<double> phi;
-  vector<double> z;
-  int j=0;
-  for(int i=0;i<N_photons;i++)
-  {
+    return nav->GetCurrentNode()->GetVolume()->GetMedium()->GetMaterial()->GetDensity();
+}
 
-    InitializePhotonTrack(i);
-    geom->FindNextBoundary();
-    geom->Step(kTRUE,kFALSE);
-    if(cpoint[2]<0){break;};
-    double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
-    if(abs(r-Radius)<1e-6)
-    {
-      phi.push_back(tools::RadialTheta(cpoint));
-      z.push_back(cpoint[2]-12.5);
-      //cout<<phi[j]<<" "<<z[j]<<endl;
-      //j++;
+double Tracker::GetRefractiveIndex()
+{
+  if(CheckDensity() == 1.023)
+  {
+    return 1.58;
+  }
+  if(CheckDensity()==0)
+  {
+    return 1;
+  }else
+  {
+    return 1.58;
+  }
+  return 0;
+}
+
+bool Tracker::Check_Symmetric_Detector()
+{
+  double h = abs(cpoint[2]);
+
+  if(h>(0.5*(param.Height+param.Distance+param.SIPM_size)) || h<(0.5*(param.Height+param.Distance-param.SIPM_size))){return false;};
+
+  double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
+  if(abs(r-param.Radius)>1e-6){return false;};
+
+  double theta = tools::PhiAngle(cpoint)/param.SIPM_angle;
+  double delta = theta - round(theta);
+  if(abs(delta) > param.SIPM_alpha){return false;};
+
+  return true;
+}
+
+bool Tracker::Is_Detector_Region()
+{
+  //Check if the photon is in the right z range
+  double h = abs(cpoint[2]);
+  if(h>(0.5*(param.Height+param.Distance+param.SIPM_size)) || h<(0.5*(param.Height+param.Distance-param.SIPM_size))){return false;};
+
+  //Check if the photon is in the scintillator boundary
+  double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
+  if(abs(r-param.Radius)>1e-6){return false;};
+
+  //Current phi angle of the photon
+  double phi = tools::PhiAngle(cpoint);
+  
+  //Check if the photon is in the phi angular range of any SIPM
+  for(double SIPM_phi : param.SIPM_angles){
+    if(abs(phi - SIPM_phi) < param.SIPM_phi_range/2){
+      return true;
     }
+  }
 
+  return false;
+}
+
+////////////////////////////////////// Bethe Bloch function to calculate energy loss in material //////////////////////////////////
+
+double Tracker::BetheBloch(double v){
+
+    int Z=-1;
+    double c = 299792458;
+    double mp = 1.672621637e-27;
+    double me = 9.1093821499999992e-31;
+    double qe = 1.602176487e-19;
+    double na = 6.02214179e23;
+    double eps0 = 8.854187817e-12;
+    double n_density=3.33e29; // per m^3
+    double I = 1.03660828e-17;
+
+    return ((qe*qe*qe*qe*n_density*Z*Z*(log((2*me*c*c*v*v)/(I*(1-v*v)))-v*v))/(4*M_PI*eps0*eps0*me*c*c*v*v))/(1.602e-13);
+}
+
+
+//Propagate photons until they reach the lateral disk boundary of a scintillator for the first time and save the height and phi angle positions
+std::vector<std::pair<double,double>> Tracker::PropagatePhotons_To_FirstBoundary(int iphoton, int fphoton)
+{
+  std::vector<std::pair<double,double>> points; //vector of pairs to save z and phi
+  
+  //loop on photon vector between specified indexes
+  for(int i=iphoton; i<fphoton; i++){
+
+    //Setting both initial point and direction and finding the state
+    nav->InitTrack(Photons[i]->GetStartingPosition().data(), Photons[i]->GetDirection().data());
+    //Find distance to the next boundary and set step
+    nav->FindNextBoundary();
+    //Take step to next boundary but dont cross boundary (second flag is kFALSE)
+    nav->Step(kTRUE,kFALSE); 
+    double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
+    
+    //check if the photon is near the lateral boundary and save phi and z in vector of pairs
+    if(abs(r-param.Radius)<1e-6){
+      points.emplace_back(std::make_pair(tools::PhiAngle(cpoint), cpoint[2]));
+    }
   }
-  auto H = new TH2D("h","",20,-M_PI,M_PI,20,0,1);
-  for(int i=0;i<phi.size();i++)
-  {
-    H->Fill(phi[i],z[i]);
-  }
-  auto c = new TCanvas("c","c",1600,1000);
-  H->Draw("colz");
-  c->SaveAs("b.pdf");
-  return;
+
+  return points;
 }

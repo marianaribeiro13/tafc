@@ -12,6 +12,7 @@ public:
 
   //constructors and destructor
   Particle(int const PDG, double p, std::vector<double> const& d,vector<double> const& x); // give pdg, momentum and direction vector
+  Particle(int const PDG, double mass, double p, std::vector<double> const& d,vector<double> const& x); // give pdg, momentum and direction vector
   Particle(Particle* part); //copy constructor
   //Particle(int const PDG, double E, std::vector<double> const& d); // give pdg, energy and direction vector
   ~Particle();

@@ -25,7 +25,7 @@ public:
   static TSpline3* Interpolate_From_File(string); //Receives a filename and outputs an interpolation
   static vector<double> NormalizeVector(vector<double>);
   static void print_vector(const double*);
-  static double RadialTheta(const double*);
+  static double PhiAngle(const double*);
   ~tools();
 
 

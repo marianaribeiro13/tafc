@@ -34,11 +34,11 @@ $(LIBDIR)/libFC.a: $(OBJ)
 
 %.exe: $(BINDIR)/%.o $(LIBDIR)/libFC.a 
 	@echo compilink and linking... 
-	$(CC) -I src $< -o $(BINDIR)/$@ -L lib -l FC $(ROOTLIB) -lGeom -lEG -fopenmp
+	$(CC) -I src $< -o $(BINDIR)/$@ -L lib -l FC $(ROOTLIB) -lGeom -lEG -lpthread
 
 $(BINDIR)/%.o: %.C | $(INC)
 	@echo compiling... $<
-	$(CC) -I src -I $(ROOTINC) -c $< -o $@
+	$(CC) -I src -I $(ROOTINC) -c -lpthread $< -o $@
 
 
 ######### clean

@@ -2,21 +2,25 @@
 using namespace std;
 ///////////////////////////////// Constructor ///////////////////////////////
 
-Geometry::Geometry(){
+Geometry::Geometry() : Radius(0.), Height(0.),
+                      Distance(0.), innerradius(0.),
+	                    outerradius(0.), Thickness(0.),
+                      Airgap(0.), MaxHeight(0.),
+	                    MaxRadius(0.) 
+{
 
-    geom = new TGeoManager("telescope", "Telescope geometry");
+  geom = new TGeoManager("telescope", "Telescope geometry");
 
 }
 
 Geometry::~Geometry()
 {
-    delete geom;
-
+  delete geom;
 }
 
 ///////////////////////////// Build Muon Telescope //////////////////////////
 
-void Geometry::Build_MuonTelescope(double radius, double height, double distance, double airgap, double althickness,int n_SIPMS,double s_size)
+void Geometry::Build_MuonTelescope(double radius, double height, double distance, double airgap, double althickness)
 {
     Radius = radius;
     Height = height;
@@ -28,11 +32,6 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
     Thickness = althickness;
     MaxHeight = (distance/2+height+airgap+althickness)*1.2;
     MaxRadius = 2*outerradius;
-
-    n_SIPM = n_SIPMS;
-    SIPM_size = s_size;
-    SIPM_angle = 2*M_PI / n_SIPM;
-    SIPM_alpha = 0.5*SIPM_size/(SIPM_angle*Radius);
 
     //--- define some materials
     TGeoMaterial *matVacuum = new TGeoMaterial("Vacuum", 0, 0, 0);
@@ -53,7 +52,7 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
     TGeoTranslation *tr2 = new TGeoTranslation(0., 0., - (double)(distance + height)/2.);
 
     TGeoVolume *scintillator = geom->MakeTube("scintillator", Plastic, 0, radius, height/2.); // rmin, rmax, mid height
-    scintillator->SetLineColor(kOrange+10);
+    scintillator->SetLineColor(kGreen+10);
     top->AddNode(scintillator, 1, tr1);
     top->AddNode(scintillator, 2, tr2);
 
@@ -80,39 +79,3 @@ void Geometry::Build_MuonTelescope(double radius, double height, double distance
 
 }
 
-double Geometry::CheckDensity()
-{
-    return geom->GetCurrentNode()->GetVolume()->GetMedium()->GetMaterial()->GetDensity();
-}
-
-double Geometry::GetRefractiveIndex()
-{
-  if(CheckDensity() == 1.023)
-  {
-    return 1.58;
-  }
-  if(CheckDensity()==0)
-  {
-    return 1;
-  }else
-  {
-    return 1.58;
-  }
-  return 0;
-}
-
-bool Geometry::Check_Symmetric_Detector(const double* cpoint)
-{
-    double h = abs(cpoint[2]);
-
-    if(h>(0.5*(Height+Distance+SIPM_size)) || h<(0.5*(Height+Distance-SIPM_size))){return false;};
-
-    double r = sqrt(cpoint[0]*cpoint[0]+cpoint[1]*cpoint[1]);
-    if(abs(r-Radius)>1e-6){return false;};
-
-    double theta = atan(cpoint[1]/cpoint[0])/SIPM_angle;
-    double delta = theta - round(theta);
-    if(abs(delta) > SIPM_alpha){return false;};
-
-    return true;
-}

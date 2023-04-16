@@ -113,17 +113,17 @@ void tools::print_vector(const double* v)
   return;
 }
 
-double tools::RadialTheta(const double *cpoint)
+double tools::PhiAngle(const double *cpoint)
 {
   if(cpoint[0]>0)
   {
-    return atan(cpoint[1]/cpoint[0]);
+    return atan(cpoint[1]/cpoint[0]); 
   }else
   {
-    if(cpoint[1]>=0)
+    if(cpoint[1]>=0) // x<0 and y>0
     {
       return atan(cpoint[1]/cpoint[0])+M_PI;
-    }else
+    }else // x<0 and y<0
     {
       return atan(cpoint[1]/cpoint[0])-M_PI;
     }
